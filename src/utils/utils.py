@@ -63,7 +63,7 @@ class Train:
         else:
             raise ValueError(f"Criterion '{criterion}' not found. Available options are: {list(criterion_dict.keys())}")
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        # print(f'Using {self.device}')
+        print(f'Using {self.device}')
         self.verbose = verbose
         self.plot = plot
 

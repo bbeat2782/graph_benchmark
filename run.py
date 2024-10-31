@@ -14,7 +14,7 @@ def main(nhid=64, heads=4, lr=0.001, batch_size=64, epochs=500, datasets=['Cora'
     for dataset, task in zip(datasets, tasks):
         result[dataset] = {}
         for model, name in zip([GCN, GIN, GAT], ['GCN', 'GIN', 'GAT']):
-            train_accs, val_accs, test_accs = default_test(dataset, task, model, num_iterations=5, num_layer=2, nhid=nhid, heads=heads, lr=lr, batch_size=batch_size, epochs=epochs)
+            train_accs, val_accs, test_accs = default_test(dataset, task, model, num_iterations=30, num_layer=2, nhid=nhid, heads=heads, lr=lr, batch_size=batch_size, epochs=epochs)
             result[dataset][name] = {
                 'train_accs': train_accs,
                 'val_accs': val_accs,
