@@ -281,15 +281,15 @@ def plot_accuracy(result, dataset_name):
     plt.ylabel('Accuracy')
     plt.xticks(num_layers)
     plt.title(f'Validation and Test Accuracy for GCN, GIN, GAT on {dataset_name}')
-    plt.legend()
-    plt.savefig(f'figures/{dataset_name}_accuracy_histories.png', format='png', dpi=300)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+    plt.savefig(f'figures/{dataset_name}_accuracy_histories.png', format='png', dpi=300, bbox_inches="tight")
     plt.close()
 
 
 def changing_num_layers(dataset, task, model_class, nhid=64, heads=4, lr=0.001, batch_size=64, epochs=500):
     trainer = Train(dataset=dataset, task=task, verbose=False)
     train_accs, val_accs, test_accs = [], [], []
-    for num_layer in range(1, 15):
+    for num_layer in range(1, 13):
         _, _, _, train_acc, val_acc, test_acc = trainer(
             model_class=model_class,
             nhid=nhid,
