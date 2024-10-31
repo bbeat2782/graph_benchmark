@@ -1,6 +1,6 @@
 from torch_geometric.nn import GCNConv
 from torch.nn import BatchNorm1d as BatchNorm
-from gnn.gnn import GNN
+from .gnn import GNN
 
 
 class GCN(GNN):

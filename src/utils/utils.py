@@ -6,11 +6,11 @@ import random
 from torch_geometric.data import Data, Dataset
 from torch_geometric.utils import to_networkx
 from torch_geometric.datasets import TUDataset, Planetoid
-from earlystopping import EarlyStoppingLoss
 from torch_geometric.loader import DataLoader
 from torch.utils.data import random_split
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
+from .earlystopping import EarlyStoppingLoss
 
 
 class CustomDataset(Dataset):
@@ -132,21 +132,36 @@ class Train:
                 break
 
         # Load the best model and evaluate on the test set
-        model.load_state_dict(torch.load(early_stopping.fname, weights_only=True))
+        model.load_state_dict(torch.load(f'{early_stopping.prefix_path}/{early_stopping.fname}', weights_only=True))
         model.eval()
-        correct = 0
         with torch.no_grad():
+            correct = 0
             for data in test_loader:
                 data = data.to(self.device)
                 out = model(data, task=self.task)
                 pred = out.argmax(dim=1)
                 correct += int((pred == data.y).sum())
+            test_acc = correct / len(test_loader.dataset)
 
-        test_acc = correct / len(test_loader.dataset)
-        # print(f'Test Accuracy: {test_acc}')
+            correct = 0
+            for data in train_loader:
+                data = data.to(self.device)
+                out = model(data, task=self.task)
+                pred = out.argmax(dim=1)
+                correct += int((pred == data.y).sum())
+            train_acc = correct / len(train_loader.dataset)
+
+            correct = 0
+            for data in val_loader:
+                data = data.to(self.device)
+                out = model(data, task=self.task)
+                pred = out.argmax(dim=1)
+                correct += int((pred == data.y).sum())
+            val_acc = correct / len(val_loader.dataset)
+
         if self.plot:
             self.plot_training_metrics(train_history, val_history, val_accs, f'{self.dataset_name}_{model._get_name()}')
-        return train_history, val_history, val_accs, test_acc
+        return train_history, val_history, val_accs, train_acc, val_acc, test_acc
 
     def plot_training_metrics(self, train_history, val_history, val_accs, base_filename):
         # Training and Validation Loss
@@ -155,22 +170,22 @@ class Train:
         plt.plot(val_history, label='Validation Loss')
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
-        plt.title('Training and Validation Loss')
+        plt.title(f'{base_filename} Training and Validation Loss')
         plt.legend()
         plt.tight_layout()
-        plt.savefig(f'{base_filename}_loss.png')
-        plt.show()
+        plt.savefig(f'figures/{base_filename}_loss.png')
+        plt.close()
 
         # Validation Accuracy
         plt.figure(figsize=(10, 5))
         plt.plot(val_accs, label='Validation Accuracy')
         plt.xlabel('Epochs')
         plt.ylabel('Accuracy')
-        plt.title('Validation Accuracy')
+        plt.title(f'{base_filename} Validation Accuracy')
         plt.ylim(0, 1)
         plt.tight_layout()
-        plt.savefig(f'{base_filename}_accuracy.png')
-        plt.show()
+        plt.savefig(f'figures/{base_filename}_accuracy.png')
+        plt.close()
 
     def cora_training(self, model, optimizer, early_stopping, epochs):
         data = self.dataset[0].to(self.device)
@@ -199,15 +214,21 @@ class Train:
                     # print(f'Early stopping triggered after {epoch+1} epochs.')
                     break
 
-        model.load_state_dict(torch.load(early_stopping.fname, weights_only=True))
+        model.load_state_dict(torch.load(f'{early_stopping.prefix_path}/{early_stopping.fname}', weights_only=True))
         model.eval()
         pred = model(data).argmax(dim=1)
         correct = (pred[data.test_mask] == data.y[data.test_mask]).sum()
-        test_acc = int(correct) / int(data.test_mask.sum())
+        test_acc = int(correct) / len(pred[data.test_mask])
+
+        correct = (pred[data.val_mask] == data.y[data.val_mask]).sum()
+        val_acc = int(correct) / len(pred[data.val_mask])
+
+        correct = (pred[data.train_mask] == data.y[data.train_mask]).sum()
+        train_acc = int(correct) / len(pred[data.train_mask])
         # print(f'Test Accuracy: {test_acc}')
         if self.plot:
             self.plot_training_metrics(train_history, val_history, val_accs, f'{self.dataset_name}_{model._get_name()}')
-        return train_history, val_history, val_accs, test_acc
+        return train_history, val_history, val_accs, train_acc, val_acc, test_acc
 
 
 def setup_seed(seed=42):
@@ -238,3 +259,48 @@ def add_node_features(data):
     features = torch.tensor(degrees).view(-1, 1)
 
     return Data(x=features, edge_index=data.edge_index, y=data.y)
+
+
+def plot_accuracy(result, dataset_name):
+    plt.figure(figsize=(10, 5))
+    num_layers = range(1, len(result['GCN']['val_accs']) + 1)
+
+    # Define colors for each model
+    model_colors = {
+        'GCN': 'blue',
+        'GIN': 'red',
+        'GAT': 'green'
+    }
+
+    for model_name, color in model_colors.items():
+        plt.plot(num_layers, result[model_name]['train_accs'], label=f'{model_name} Train Acc', linestyle=':', color=color, alpha=0.5)
+        plt.plot(num_layers, result[model_name]['val_accs'], label=f'{model_name} Val Acc', linestyle='--', color=color)
+        plt.plot(num_layers, result[model_name]['test_accs'], label=f'{model_name} Test Acc', linestyle='-', color=color)
+
+    plt.xlabel('Number of Layers')
+    plt.ylabel('Accuracy')
+    plt.xticks(num_layers)
+    plt.title(f'Validation and Test Accuracy for GCN, GIN, GAT on {dataset_name}')
+    plt.legend()
+    plt.savefig(f'figures/{dataset_name}_accuracy_histories.png', format='png', dpi=300)
+    plt.close()
+
+
+def changing_num_layers(dataset, task, model_class, nhid=64, heads=4, lr=0.001, batch_size=64, epochs=500):
+    trainer = Train(dataset=dataset, task=task, verbose=False)
+    train_accs, val_accs, test_accs = [], [], []
+    for num_layer in range(1, 15):
+        _, _, _, train_acc, val_acc, test_acc = trainer(
+            model_class=model_class,
+            nhid=nhid,
+            heads=heads,
+            mlp_num=num_layer,
+            lr=lr,
+            batch_size=batch_size,
+            epochs=epochs
+        )
+        val_accs.append(val_acc)
+        test_accs.append(test_acc)
+        train_accs.append(train_acc)
+
+    return train_accs, val_accs, test_accs

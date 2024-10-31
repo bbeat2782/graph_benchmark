@@ -8,7 +8,7 @@ class EarlyStoppingLoss:
     improve after a given patience.
     """
 
-    def __init__(self, fname='es_checkpoint.pth', patience=5, verbose=False, delta=0, prefix=None):
+    def __init__(self, fname='es_checkpoint.pth', patience=5, verbose=False, delta=0, prefix='model_chkt_pnt'):
         """
         Args:
             fname (str)   : Checkpoint file name
@@ -22,7 +22,7 @@ class EarlyStoppingLoss:
         self.counter = 0
         self.best_score = None
         self.early_stop = False
-        self.val_loss_min = np.Inf
+        self.val_loss_min = np.inf
         self.delta = delta
         self.prefix_path = prefix
         self.fname = fname
@@ -34,8 +34,8 @@ class EarlyStoppingLoss:
             self.best_score = score
         elif score > self.best_score + self.delta:
             self.counter += 1
-            print(f'EarlyStopping Loss counter: {self.counter} out of {self.patience}')
-            print(f'Now loss:{val_loss}\tBest_loss:{self.best_score}')
+            if self.verbose:
+                print(f'EarlyStopping Loss counter: {self.counter} out of {self.patience}')
             if self.counter >= self.patience:
                 self.early_stop = True
         else:
@@ -46,5 +46,7 @@ class EarlyStoppingLoss:
     def save_checkpoint(self, val_loss, model):
         if self.verbose:
             print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-        torch.save(model.state_dict(), self.prefix_path + self.fname)
+
+        file_name = f'{self.prefix_path}/{self.fname}'
+        torch.save(model.state_dict(), file_name)
         self.val_loss_min = val_loss
