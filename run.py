@@ -1,7 +1,7 @@
 import sys
 import os
 import json
-from src.utils.utils import Train, plot_accuracy, changing_num_layers
+from src.utils.utils import Train, plot_accuracy, changing_num_layers, default_test, plot_boxplot
 from src.models.gcn import GCN
 from src.models.gin import GIN
 from src.models.gat import GAT
@@ -9,19 +9,34 @@ from src.models.gat import GAT
 
 def main(nhid=64, heads=4, lr=0.001, batch_size=64, epochs=500, datasets=['Cora', 'ENZYMES', 'IMDB-BINARY'], tasks=['node', 'graph', 'graph']):
 
-    # Testing how different GNNs perform when number of layers changes
+    # Experiment 1
     result = {}
     for dataset, task in zip(datasets, tasks):
+        result[dataset] = {}
         for model, name in zip([GCN, GIN, GAT], ['GCN', 'GIN', 'GAT']):
-            train_accs, val_accs, test_accs = changing_num_layers(dataset, task, model, nhid=nhid, heads=heads, lr=lr, batch_size=batch_size, epochs=epochs)
-            result[name] = {
+            train_accs, val_accs, test_accs = default_test(dataset, task, model, num_iterations=5, num_layer=2, nhid=nhid, heads=heads, lr=lr, batch_size=batch_size, epochs=epochs)
+            result[dataset][name] = {
                 'train_accs': train_accs,
                 'val_accs': val_accs,
                 'test_accs': test_accs
             }
 
-        plot_accuracy(result, dataset)
+    plot_boxplot(result)
 
+    # Experiment 2
+    # Testing how different GNNs perform when number of layers changes
+
+    # result = {}
+    # for dataset, task in zip(datasets, tasks):
+    #     for model, name in zip([GCN, GIN, GAT], ['GCN', 'GIN', 'GAT']):
+    #         train_accs, val_accs, test_accs = changing_num_layers(dataset, task, model, nhid=nhid, heads=heads, lr=lr, batch_size=batch_size, epochs=epochs)
+    #         result[name] = {
+    #             'train_accs': train_accs,
+    #             'val_accs': val_accs,
+    #             'test_accs': test_accs
+    #         }
+
+    #     plot_accuracy(result, dataset)
 
     return None
 

@@ -11,6 +11,7 @@ from torch.utils.data import random_split
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from .earlystopping import EarlyStoppingLoss
+import pandas as pd
 
 
 class CustomDataset(Dataset):
@@ -304,3 +305,98 @@ def changing_num_layers(dataset, task, model_class, nhid=64, heads=4, lr=0.001, 
         train_accs.append(train_acc)
 
     return train_accs, val_accs, test_accs
+
+
+def default_test(dataset, task, model_class, num_iterations=30, num_layer=2, nhid=64, heads=4, lr=0.001, batch_size=64, epochs=500):
+    trainer = Train(dataset=dataset, task=task, verbose=False)
+    train_accs, val_accs, test_accs = [], [], []
+    for _ in range(num_iterations):
+        _, _, _, train_acc, val_acc, test_acc = trainer(
+            model_class=model_class,
+            nhid=nhid,
+            heads=heads,
+            mlp_num=num_layer,
+            lr=lr,
+            batch_size=batch_size,
+            epochs=epochs
+        )
+        val_accs.append(val_acc)
+        test_accs.append(test_acc)
+        train_accs.append(train_acc)
+
+    return train_accs, val_accs, test_accs
+
+
+def plot_boxplot(result):
+    datasets = list(result.keys())
+    models = list(result[datasets[0]].keys())
+    metrics = list(result[datasets[0]][models[0]].keys())
+    
+    # Colors for train, validation, and test
+    metric_colors = {
+        'train_accs': 'skyblue',
+        'val_accs': 'salmon',
+        'test_accs': 'lightgreen'
+    }
+
+    # Create directory for CSVs if it doesn't exist
+    os.makedirs("results_csv", exist_ok=True)
+
+    fig, axes = plt.subplots(1, len(datasets), figsize=(18, 6), sharey=True)
+    fig.suptitle('Performance Distribution Across Datasets', fontsize=16)
+
+    csv_data = []  # Initialize data storage for CSV
+
+    for i, (dataset, ax) in enumerate(zip(datasets, axes)):
+        data_to_plot = []
+        labels = []
+        positions = []
+        pos = 1
+
+        for model in models:
+            model_data = []  # Holds data for the current model
+            for metric in metrics:
+                model_data.append(result[dataset][model][metric])
+                csv_data.append({
+                    'Dataset': dataset,
+                    'Model': model,
+                    'Metric': metric,
+                    'Values': result[dataset][model][metric]
+                })
+
+            # Append model data to the main list and add positions
+            data_to_plot.extend(model_data)
+            labels.append(model)  # Label model once
+            positions.extend([pos, pos + 1, pos + 2])  # Position each metric under its model group
+            pos += 4  # Leave space for separation between model groups
+
+        # Plot each metric with different colors
+        bp = ax.boxplot(data_to_plot, patch_artist=True, positions=positions)
+        for patch, metric in zip(bp['boxes'], metrics * len(models)):
+            patch.set_facecolor(metric_colors[metric])
+
+        # Draw dividing lines between models
+        for j in range(1, len(models)):
+            ax.axvline(x=j * 4 - 0.5, color='grey', linestyle='--')
+
+        # Set x-tick labels to model names only, centered under each set of boxplots
+        ax.set_xticks([j * 4 + 1 for j in range(len(models))])
+        ax.set_xticklabels(models, rotation=45, ha='right')
+
+        # Axis labels and limits
+        ax.set_title(f"{dataset}", fontsize=14)
+        ax.set_xlabel("Model")
+        ax.set_ylim(0, 1)
+    
+    # Set y-axis label for the entire figure
+    axes[0].set_ylabel('Accuracy')
+    
+    # Save each dataset's CSV data
+    for dataset in datasets:
+        df = pd.DataFrame([entry for entry in csv_data if entry['Dataset'] == dataset])
+        df.to_csv(f'results_csv/{dataset}_accuracy_results.csv', index=False)
+
+    # Save and display
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.savefig(f'figures/combined_boxplot.png', format='png', dpi=300)
+    plt.close()
