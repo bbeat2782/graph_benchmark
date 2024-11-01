@@ -70,7 +70,9 @@ class Train:
     def __call__(self, model_class, nhid=64, heads=None, mlp_num=2, lr=0.001, batch_size=64, epochs=1000):
         model = model_class(self.nfeat, nhid, self.nclass, mlp_num, heads=heads).to(self.device)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-        early_stopping = EarlyStoppingLoss(patience=10, fname=f'{self.dataset_name}_{model._get_name()}_best_model.pth')
+        early_stopping = EarlyStoppingLoss(patience=10, fname=f'{self.dataset_name}_{model._get_name()}_{mlp_num}_layers_best_model.pth')
+        max_retries = 5
+        retry_delay = 0.1
 
         if self.dataset_name == 'CORA':
             return self.cora_training(model, optimizer, early_stopping, epochs)
@@ -83,7 +85,7 @@ class Train:
         test_size = len(self.dataset) - train_size - val_size
         train_dataset, val_dataset, test_dataset = random_split(
             self.dataset, [train_size, val_size, test_size],
-            generator=torch.Generator().manual_seed(42)
+#            generator=torch.Generator().manual_seed(42)
         )
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
@@ -133,7 +135,9 @@ class Train:
                 break
 
         # Load the best model and evaluate on the test set
-        model.load_state_dict(torch.load(f'{early_stopping.prefix_path}/{early_stopping.fname}', weights_only=True))
+        #model.load_state_dict(torch.load(f'{early_stopping.prefix_path}/{early_stopping.fname}', weights_only=True))
+        best_model_state = early_stopping.get_best_model()
+        model.load_state_dict(best_model_state)
         model.eval()
         with torch.no_grad():
             correct = 0
@@ -191,6 +195,29 @@ class Train:
     def cora_training(self, model, optimizer, early_stopping, epochs):
         data = self.dataset[0].to(self.device)
         train_history, val_history, val_accs = [], [], []
+        
+        # Set the split ratios for training, validation, and test sets
+        num_nodes = data.y.size(0)
+        train_size = int(0.7 * num_nodes)
+        val_size = int(0.15 * num_nodes)
+        test_size = num_nodes - train_size - val_size
+        
+        # Randomly split indices for each mask
+        indices = torch.randperm(num_nodes)
+        train_indices = indices[:train_size]
+        val_indices = indices[train_size:train_size + val_size]
+        test_indices = indices[train_size + val_size:]
+        
+        # Initialize the masks
+        data.train_mask = torch.zeros(num_nodes, dtype=torch.bool).to(self.device)
+        data.val_mask = torch.zeros(num_nodes, dtype=torch.bool).to(self.device)
+        data.test_mask = torch.zeros(num_nodes, dtype=torch.bool).to(self.device)
+        
+        # Set the masks based on the split indices
+        data.train_mask[train_indices] = True
+        data.val_mask[val_indices] = True
+        data.test_mask[test_indices] = True
+        
         for epoch in range(epochs):
             model.train()
             optimizer.zero_grad()
@@ -215,7 +242,9 @@ class Train:
                     # print(f'Early stopping triggered after {epoch+1} epochs.')
                     break
 
-        model.load_state_dict(torch.load(f'{early_stopping.prefix_path}/{early_stopping.fname}', weights_only=True))
+        #model.load_state_dict(torch.load(f'{early_stopping.prefix_path}/{early_stopping.fname}', weights_only=True))
+        best_model_state = early_stopping.get_best_model()
+        model.load_state_dict(best_model_state)
         model.eval()
         pred = model(data).argmax(dim=1)
         correct = (pred[data.test_mask] == data.y[data.test_mask]).sum()
@@ -281,7 +310,7 @@ def plot_accuracy(result, dataset_name):
     plt.xlabel('Number of Layers')
     plt.ylabel('Accuracy')
     plt.xticks(num_layers)
-    plt.title(f'Validation and Test Accuracy for GCN, GIN, GAT on {dataset_name}')
+    plt.title(f'Accuracies for GCN, GIN, GAT on {dataset_name}')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
     plt.savefig(f'figures/{dataset_name}_accuracy_histories.png', format='png', dpi=300, bbox_inches="tight")
     plt.close()
@@ -290,19 +319,26 @@ def plot_accuracy(result, dataset_name):
 def changing_num_layers(dataset, task, model_class, nhid=64, heads=4, lr=0.001, batch_size=64, epochs=500):
     trainer = Train(dataset=dataset, task=task, verbose=False)
     train_accs, val_accs, test_accs = [], [], []
-    for num_layer in range(1, 13):
-        _, _, _, train_acc, val_acc, test_acc = trainer(
-            model_class=model_class,
-            nhid=nhid,
-            heads=heads,
-            mlp_num=num_layer,
-            lr=lr,
-            batch_size=batch_size,
-            epochs=epochs
-        )
-        val_accs.append(val_acc)
-        test_accs.append(test_acc)
-        train_accs.append(train_acc)
+    for num_layer in range(1, 16):
+        print(num_layer)
+        train_tmp, val_tmp, test_tmp = [], [], []
+        for _ in range(30):
+            _, _, _, train_acc, val_acc, test_acc = trainer(
+                model_class=model_class,
+                nhid=nhid,
+                heads=heads,
+                mlp_num=num_layer,
+                lr=lr,
+                batch_size=batch_size,
+                epochs=epochs
+            )
+            train_tmp.append(train_acc)
+            val_tmp.append(val_acc)
+            test_tmp.append(test_acc)
+
+        train_accs.append(np.median(train_tmp))
+        val_accs.append(np.median(val_tmp))
+        test_accs.append(np.median(test_tmp))
 
     return train_accs, val_accs, test_accs
 

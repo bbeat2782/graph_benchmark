@@ -25,18 +25,17 @@ def main(nhid=64, heads=4, lr=0.001, batch_size=64, epochs=500, datasets=['Cora'
 
     # Experiment 2
     # Testing how different GNNs perform when number of layers changes
+    result = {}
+    for dataset, task in zip(datasets, tasks):
+        for model, name in zip([GCN, GIN, GAT], ['GCN', 'GIN', 'GAT']):
+            train_accs, val_accs, test_accs = changing_num_layers(dataset, task, model, nhid=nhid, heads=heads, lr=lr, batch_size=batch_size, epochs=epochs)
+            result[name] = {
+                'train_accs': train_accs,
+                'val_accs': val_accs,
+                'test_accs': test_accs
+            }
 
-    # result = {}
-    # for dataset, task in zip(datasets, tasks):
-    #     for model, name in zip([GCN, GIN, GAT], ['GCN', 'GIN', 'GAT']):
-    #         train_accs, val_accs, test_accs = changing_num_layers(dataset, task, model, nhid=nhid, heads=heads, lr=lr, batch_size=batch_size, epochs=epochs)
-    #         result[name] = {
-    #             'train_accs': train_accs,
-    #             'val_accs': val_accs,
-    #             'test_accs': test_accs
-    #         }
-
-    #     plot_accuracy(result, dataset)
+        plot_accuracy(result, dataset)
 
     return None
 

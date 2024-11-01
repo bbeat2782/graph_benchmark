@@ -26,27 +26,31 @@ class EarlyStoppingLoss:
         self.delta = delta
         self.prefix_path = prefix
         self.fname = fname
+        self.best_model_state = None
 
     def __call__(self, val_loss, model):
         score = val_loss
 
-        if self.best_score is None:
+        if self.best_score is None or score < self.best_score - self.delta:
             self.best_score = score
-        elif score > self.best_score + self.delta:
+            self.best_model_state = model.state_dict()
+            self.counter = 0
+            if self.verbose:
+                print(f"Validation loss improved to {val_loss:.6f}. Saving best model state.")
+        else:
             self.counter += 1
             if self.verbose:
-                print(f'EarlyStopping Loss counter: {self.counter} out of {self.patience}')
+                print(f"EarlyStopping counter: {self.counter} out of {self.patience}")
             if self.counter >= self.patience:
                 self.early_stop = True
-        else:
-            self.best_score = score
-            self.save_checkpoint(val_loss, model)
-            self.counter = 0
 
-    def save_checkpoint(self, val_loss, model):
-        if self.verbose:
-            print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+#     def save_checkpoint(self, val_loss, model):
+#         if self.verbose:
+#             print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
 
-        file_name = f'{self.prefix_path}/{self.fname}'
-        torch.save(model.state_dict(), file_name)
-        self.val_loss_min = val_loss
+#         file_name = f'{self.prefix_path}/{self.fname}'
+#         torch.save(model.state_dict(), file_name)
+#         self.val_loss_min = val_loss
+        
+    def get_best_model(self):
+        return self.best_model_state
