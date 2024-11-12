@@ -1,0 +1,27 @@
+out_dir: results
+metric_best: ap
+dataset:
+  format: PyG-LRGBDataset
+  name: Peptides-func
+  task: graph
+  task_type: classification_multilabel
+train:
+  batch_size: 128
+  eval_period: 1
+  epochs: 500
+model:
+  type: GAT
+  loss_fun: cross_entropy
+  graph_pooling: mean
+gnn:
+  heads: 4
+  num_layer: 4
+  nhid: 96
+  dropout: 0.5
+optim:
+  clip_grad_norm: True
+  optimizer: adamW
+  weight_decay: 0.0
+  base_lr: 0.0003
+  schedulr: cosine_with_warmup
+  num_warmup_epochs: 10

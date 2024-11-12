@@ -3,6 +3,7 @@ from torch_geometric.nn import global_add_pool, global_mean_pool
 import torch
 import torch.nn.functional as F
 from torch.nn import BatchNorm1d as BatchNorm
+from torch_geometric.utils import degree
 
 
 class GNN(torch.nn.Module):
@@ -27,7 +28,11 @@ class GNN(torch.nn.Module):
         x, edge_index = data.x, data.edge_index
 
         for conv, batch_norm in zip(self.convs, self.batch_norms):
-            x = F.relu(batch_norm(conv(x, edge_index)))
+            # Step 1: Apply convolution
+            x = x.float()
+            x = conv(x, edge_index)
+            x = batch_norm(x)
+            x = F.relu(x)
 
         # Task-specific operations
         if task == 'graph':
