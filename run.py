@@ -7,12 +7,22 @@ from src.models.gcn import GCN
 from src.models.gin import GIN
 from src.models.gat import GAT
 
+# TODO
+# 1. Use one training function for Cora and peptides rather than separate ones
+# 2. implement num_repetition to repeat training with different train/val/test splits
+# 3. make .yaml files for Cora, Enzymes, and IMDB
+# 4. run with Cora, Enzymes, and IMDB
+# 5. make use of graph_pooling, dropout, clip_grad_norm, weight_decay, schedulr, num_warmup_epochs
+# 6. make a separate function that saves a plot using result.json
+# 7. Copy GraphGPS code??
+
+
 
 def main():
     model_dataset_to_evaluate = [
-        'configs/GAT/GAT_peptides-func.yaml',
         'configs/GCN/GCN_peptides-func.yaml',
         'configs/GIN/GIN_peptides-func.yaml',
+        'configs/GAT/GAT_peptides-func.yaml',
     ]
 
     result = {}
