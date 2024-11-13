@@ -9,12 +9,15 @@ train:
   batch_size: 128
   eval_period: 1
   epochs: 500
+  repetition: 2
+  split_mode: random
+  split_ratios: [0.7, 0.15, 0.15]
 model:
   type: GCN
   loss_fun: cross_entropy
   graph_pooling: mean
 gnn:
-  heads: None
+  heads: null
   num_layer: 4
   nhid: 96
   dropout: 0.5
@@ -23,5 +26,6 @@ optim:
   optimizer: adamW
   weight_decay: 0.0
   base_lr: 0.0003
-  schedulr: cosine_with_warmup
-  num_warmup_epochs: 10
+  scheduler: steplr
+  step_size: 50
+  gamma: 0.5

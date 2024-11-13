@@ -1,12 +1,12 @@
 out_dir: results
-metric_best: ap
+metric_best: accuracy
 dataset:
-  format: PyG-LRGBDataset
-  name: Peptides-func
+  format: PyG-TUDataset
+  name: IMDB-BINARY
   task: graph
-  task_type: classification_multilabel
+  task_type: classification
 train:
-  batch_size: 128
+  batch_size: 64
   eval_period: 1
   epochs: 500
   repetition: 2
@@ -17,15 +17,15 @@ model:
   loss_fun: cross_entropy
   graph_pooling: mean
 gnn:
-  heads: None
-  num_layer: 4
-  nhid: 96
+  heads: null
+  num_layer: 3
+  nhid: 64
   dropout: 0.5
 optim:
   clip_grad_norm: True
-  optimizer: adamW
+  optimizer: adam
   weight_decay: 0.0
-  base_lr: 0.0003
+  base_lr: 0.001
   scheduler: steplr
   step_size: 50
   gamma: 0.5

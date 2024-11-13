@@ -2,24 +2,30 @@ import sys
 import os
 import json
 import yaml
-from src.utils.utils import Train, plot_accuracy, changing_num_layers, default_test, plot_boxplot
+from src.utils.utils import Train, plot_accuracy, changing_num_layers, plot_boxplot
 from src.models.gcn import GCN
 from src.models.gin import GIN
 from src.models.gat import GAT
 
 # TODO
-# 1. Use one training function for Cora and peptides rather than separate ones
-# 2. implement num_repetition to repeat training with different train/val/test splits
-# 3. make .yaml files for Cora, Enzymes, and IMDB
-# 4. run with Cora, Enzymes, and IMDB
-# 5. make use of graph_pooling, dropout, clip_grad_norm, weight_decay, schedulr, num_warmup_epochs
+# 1. Use one training function for Cora too
+# 2. code for testing multiple layers
+# 3. make .yaml files for Cora
+# 4. run with Cora
+# 5. make use of graph_pooling, dropout, clip_grad_norm, weight_decay
 # 6. make a separate function that saves a plot using result.json
 # 7. Copy GraphGPS code??
-
+# 8. clean earlystopping
 
 
 def main():
     model_dataset_to_evaluate = [
+        'configs/GCN/GCN_enzymes.yaml',
+        'configs/GIN/GIN_enzymes.yaml',
+        'configs/GAT/GAT_enzymes.yaml',
+        'configs/GCN/GCN_imdb_binary.yaml',
+        'configs/GIN/GIN_imdb_binary.yaml',
+        'configs/GAT/GAT_imdb_binary.yaml',
         'configs/GCN/GCN_peptides-func.yaml',
         'configs/GIN/GIN_peptides-func.yaml',
         'configs/GAT/GAT_peptides-func.yaml',
@@ -40,6 +46,7 @@ def main():
             result[dataset_name] = {}
 
         trainer = Train(config)
+        # TODO need an extra function to get the best metric using val_loss
         train_losses, val_losses, test_losses, train_metrics, val_metrics, test_metrics = trainer()
         result[dataset_name][model_name] = {
                 'train_losses': train_losses,

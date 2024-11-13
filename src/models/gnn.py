@@ -7,7 +7,7 @@ from torch_geometric.utils import degree
 
 
 class GNN(torch.nn.Module):
-    def __init__(self, nfeat, nhid, nclass, num_layers, dropout=0.5, pooling='add', heads=1, **kwargs):
+    def __init__(self, nfeat, nhid, nclass, num_layers, dropout=0.5, pooling='mean', heads=1, **kwargs):
         super().__init__()
         self.dropout = dropout
         self.num_layers = num_layers

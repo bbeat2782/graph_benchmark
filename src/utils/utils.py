@@ -12,11 +12,12 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from .earlystopping import EarlyStoppingLoss
 import pandas as pd
-from sklearn.metrics import f1_score, average_precision_score
+from sklearn.metrics import f1_score, average_precision_score, accuracy_score
 from torch_geometric.transforms import BaseTransform
 from ..models.gcn import GCN
 from ..models.gin import GIN
 from ..models.gat import GAT
+from .split_generator import prepare_splits
 
 
 class CustomDataset(Dataset):
@@ -117,109 +118,36 @@ class Train:
         if self.optimizer is None:
             raise ValueError(f'Unsupported optimizer type: {self.optim_optimizer}')
 
+        metric_mapping = {
+            'ap': average_precision_score,
+            'f1': f1_score,
+            'accuracy': accuracy_score
+        }
+        self.metric = metric_mapping.get(self.metric_best)
+        if self.metric is None:
+            raise ValueError(f'Unsupported metric type: {self.metric_best}')
+
+        scheduler_mapping = {
+            'cosine_with_warmup': torch.optim.lr_scheduler.CosineAnnealingWarmRestarts,
+            'steplr': torch.optim.lr_scheduler.StepLR
+        }
+        self.scheduler = scheduler_mapping.get(self.optim_scheduler)
+        if self.scheduler is None:
+            raise ValueError(f'Unsupported scheduler type: {self.optim_scheduler}')
+
+        self.dataset_length = len(self.dataset)
+        
+
 
     def __call__(self):
-        model = self.model_class(self.nfeat, self.gnn_nhid, self.nclass, self.gnn_num_layer, heads=self.gnn_heads).to(self.device)
-        optimizer = self.optimizer(model.parameters(), lr=self.optim_base_lr)
-        early_stopping = EarlyStoppingLoss(patience=10, fname=f'{self.dataset_name}_{self.model_type}_{self.gnn_num_layer}_layers_best_model.pth')
-        max_retries = 5
-        retry_delay = 0.1
-
-        if self.dataset_name == 'CORA':
+        if self.dataset_name in ['Peptides-func', 'ENZYMES', 'IMDB-BINARY']:
+            return self.training()
+        elif self.dataset_name == 'CORA':
+            # TODO
             return self.cora_training(model, optimizer, early_stopping, epochs)
-        elif self.dataset_name == 'Peptides-func':
-            return self.peptides_func_training(model, optimizer, early_stopping)
+        else:
+            raise ValueError(f"Unsupported dataset: {self.dataset_name}")
 
-        train_history, val_history, val_accs = [], [], []
-
-        # 7:1.5:1.5 split
-        train_size = int(0.7 * len(self.dataset))
-        val_size = int(0.15 * len(self.dataset))
-        test_size = len(self.dataset) - train_size - val_size
-        train_dataset, val_dataset, test_dataset = random_split(
-            self.dataset, [train_size, val_size, test_size],
-#            generator=torch.Generator().manual_seed(42)
-        )
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-        # Training with early stopping
-        # TODO clean up training epochs
-        for epoch in range(epochs):
-            # Training phase
-            model.train()
-            total_loss = 0
-            for data in train_loader:
-                data = data.to(self.device)
-                out = model(data, task=self.task)
-                loss = self.criterion(out, data.y)
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
-                total_loss += loss.item()
-
-            # Validation phase
-            model.eval()
-            val_loss = 0
-            correct = 0
-            with torch.no_grad():
-                for data in val_loader:
-                    data = data.to(self.device)
-                    out = model(data, task=self.task)
-                    loss = self.criterion(out, data.y)
-                    val_loss += loss.item()
-                    pred = out.argmax(dim=1)
-                    correct += int((pred == data.y).sum())
-
-            val_loss /= len(val_loader)
-            val_acc = correct / len(val_loader.dataset)
-            val_accs.append(val_acc)
-            train_history.append(total_loss / len(train_loader))
-            val_history.append(val_loss)
-
-            if self.verbose and epoch%20==0:
-                print(f'Epoch {epoch + 1}, Training Loss: {total_loss / len(train_loader)}, Validation Loss: {val_loss}, Validation Accuracy: {val_acc}')
-
-            # Early stopping
-            early_stopping(val_loss, model)
-            if early_stopping.early_stop:
-                # print(f'Early stopping triggered after {epoch + 1} epochs.')
-                break
-
-        # Load the best model and evaluate on the test set
-        #model.load_state_dict(torch.load(f'{early_stopping.prefix_path}/{early_stopping.fname}', weights_only=True))
-        best_model_state = early_stopping.get_best_model()
-        model.load_state_dict(best_model_state)
-        model.eval()
-        with torch.no_grad():
-            correct = 0
-            for data in test_loader:
-                data = data.to(self.device)
-                out = model(data, task=self.task)
-                pred = out.argmax(dim=1)
-                correct += int((pred == data.y).sum())
-            test_acc = correct / len(test_loader.dataset)
-
-            correct = 0
-            for data in train_loader:
-                data = data.to(self.device)
-                out = model(data, task=self.task)
-                pred = out.argmax(dim=1)
-                correct += int((pred == data.y).sum())
-            train_acc = correct / len(train_loader.dataset)
-
-            correct = 0
-            for data in val_loader:
-                data = data.to(self.device)
-                out = model(data, task=self.task)
-                pred = out.argmax(dim=1)
-                correct += int((pred == data.y).sum())
-            val_acc = correct / len(val_loader.dataset)
-
-        if self.plot:
-            self.plot_training_metrics(train_history, val_history, val_accs, f'{self.dataset_name}_{model._get_name()}')
-        return train_history, val_history, val_accs, train_acc, val_acc, test_acc
 
     def plot_training_metrics(self, train_history, val_history, val_accs, base_filename):
         # Training and Validation Loss
@@ -245,97 +173,128 @@ class Train:
         plt.savefig(f'figures/{base_filename}_accuracy.png')
         plt.close()
 
-    def peptides_func_training(self, model, optimizer, early_stopping):
-        train_indices = self.dataset.split_idxs[0]
-        val_indices = self.dataset.split_idxs[1]
-        test_indices = self.dataset.split_idxs[2]
 
-        train_loader = DataLoader([self.dataset.get(i) for i in train_indices], batch_size=self.train_batch_size, shuffle=True)
-        val_loader = DataLoader([self.dataset.get(i) for i in val_indices], batch_size=self.train_batch_size, shuffle=False)
-        test_loader = DataLoader([self.dataset.get(i) for i in test_indices], batch_size=self.train_batch_size, shuffle=False)
+    def training(self):
+        all_train_losses, all_val_losses, all_test_losses = {}, {}, {}
+        all_train_metrics, all_val_metrics, all_test_metrics = {}, {}, {}
 
+        for i in range(self.train_repetition):
+            # TODO add dropout later
+            model = self.model_class(self.nfeat, self.gnn_nhid, self.nclass, self.gnn_num_layer, heads=self.gnn_heads).to(self.device)
+            optimizer = self.optimizer(model.parameters(), lr=self.optim_base_lr)
+            early_stopping = EarlyStoppingLoss(patience=100, fname=f'{self.dataset_name}_{self.model_type}_{self.gnn_num_layer}_layers_best_model.pth')
+            # TODO need a dedicated function to handle different scheduler with different configurations
+            scheduler = self.scheduler(
+                optimizer,
+                step_size=self.optim_step_size,
+                gamma=self.optim_gamma
+            )
+
+            train_size = int(self.train_split_ratios[0] * self.dataset_length)
+            val_size = int(self.train_split_ratios[1] * self.dataset_length)
+            test_size = self.dataset_length - train_size - val_size
+
+            train_set, val_set, test_set = random_split(
+                 self.dataset, [train_size, val_size, test_size]
+            )
+
+            train_loader = DataLoader(train_set, batch_size=self.train_batch_size, shuffle=True)
+            val_loader = DataLoader(val_set, batch_size=self.train_batch_size, shuffle=False)
+            test_loader = DataLoader(test_set, batch_size=self.train_batch_size, shuffle=False)
     
-        train_losses, val_losses, test_losses = [], [], []
-        train_aps, val_aps, test_aps = [], [], []
+            train_losses, val_losses, test_losses = [], [], []
+            train_metrics, val_metrics, test_metrics = [], [], []
+        
+            for epoch in range(self.train_epochs):
+                model.train()
+                total_loss = 0
+                y_true_train, y_pred_train = [], []
     
-        for epoch in range(self.train_epochs):
-            model.train()
-            total_loss = 0
-            y_true_train, y_pred_train = [], []
-
-            # Training loop
-            for batch in train_loader:
-                batch.x = batch.x.float()
-                batch = batch.to(self.device)  # Move batch to device
-
-                optimizer.zero_grad()
-
-                # Forward pass
-                out = model(batch, task=self.dataset_task)
-                loss = self.criterion(out, batch.y)
-                loss.backward()
-                optimizer.step()
-
-                total_loss += loss.item()
-                y_true_train.append(batch.y.cpu())
-                y_pred_train.append(out.detach().cpu())
-
-            train_losses.append(total_loss / len(train_loader))
-
-            y_true_train = torch.cat(y_true_train, dim=0)
-            y_pred_train = torch.cat(y_pred_train, dim=0)
-            train_ap = average_precision_score(y_true_train.numpy(), y_pred_train.numpy(), average='macro')
-            train_aps.append(train_ap)
-
-            model.eval()
-            val_loss = 0
-            y_true_val, y_pred_val = [], []
-            test_loss = 0
-            y_true_test, y_pred_test = [], []
-            with torch.no_grad():
-                for batch in val_loader:
+                # Training loop
+                for batch in train_loader:
+                    batch.x = batch.x.float()
                     batch = batch.to(self.device)
+    
+                    optimizer.zero_grad()
+    
+                    # Forward pass
                     out = model(batch, task=self.dataset_task)
                     loss = self.criterion(out, batch.y)
-                    val_loss += loss.item()
-                    y_true_val.append(batch.y.cpu())
-                    y_pred_val.append(out.detach().cpu())
+                    loss.backward()
+                    optimizer.step()
+    
+                    total_loss += loss.item()
+                    y_true_train.append(batch.y.cpu())
+                    y_pred_train.append(out.detach().cpu())
+    
+                train_losses.append(total_loss / len(train_loader))
+                train_metrics.append(self.calc_metric(y_true_train, y_pred_train))
+    
+                model.eval()
+                val_loss = 0.0
+                y_true_val, y_pred_val = [], []
+                test_loss = 0.0
+                y_true_test, y_pred_test = [], []
+                with torch.no_grad():
+                    for batch in val_loader:
+                        batch = batch.to(self.device)
+                        out = model(batch, task=self.dataset_task)
+                        loss = self.criterion(out, batch.y)
+                        val_loss += loss.item()
+                        y_true_val.append(batch.y.cpu())
+                        y_pred_val.append(out.detach().cpu())
+    
+                    for batch in test_loader:
+                        batch = batch.to(self.device)
+                        out = model(batch, task=self.dataset_task)
+                        loss = self.criterion(out, batch.y)
+                        test_loss += loss.item()
+                        y_true_test.append(batch.y.cpu())
+                        y_pred_test.append(out.detach().cpu())
 
-                for batch in test_loader:
-                    batch = batch.to(self.device)
-                    out = model(batch, task=self.dataset_task)
-                    loss = self.criterion(out, batch.y)
-                    test_loss += loss.item()
-                    y_true_test.append(batch.y.cpu())
-                    y_pred_test.append(out.detach().cpu())
+                val_losses.append(val_loss)
+                test_losses.append(test_loss)
+    
+                val_metrics.append(self.calc_metric(y_true_val, y_pred_val))
+                test_metrics.append(self.calc_metric(y_true_test, y_pred_test))
 
-            val_losses.append(val_loss / len(val_loader))
-            test_losses.append(test_loss / len(test_loader))
-
-            y_true_val = torch.cat(y_true_val, dim=0)
-            y_pred_val = torch.cat(y_pred_val, dim=0)
-            val_ap = average_precision_score(y_true_val, y_pred_val, average='macro')
-            val_aps.append(val_ap)
-
-            y_true_test = torch.cat(y_true_test, dim=0)
-            y_pred_test = torch.cat(y_pred_test, dim=0)
-            test_ap = average_precision_score(y_true_test, y_pred_test, average='macro')
-            test_aps.append(test_ap)
-
-            print('epoch:', epoch)
-            print('train_ap:', train_ap)
-            print('val_ap:', val_ap)
-            print('test_ap:', test_ap)
-
-            # Early stopping
-            early_stopping(val_loss, model)
-            if early_stopping.early_stop:
-                print("Early stopping triggered.")
-                break
+                if epoch%5 == 0:
+                    print('epoch:', epoch+1)
+                    print(f'train_{self.metric_best}:', train_metrics[-1])
+                    print(f'val_{self.metric_best}:', val_metrics[-1])
+                    print(f'test_{self.metric_best}:', test_metrics[-1])
 
 
-        return train_losses, val_losses, test_losses, train_aps, val_aps, test_aps
+                scheduler.step()
+                # Early stopping
+                early_stopping(val_loss, model)
+                if early_stopping.early_stop:
+                    print("Early stopping triggered.")
+                    break
 
+            all_train_losses[i] = train_losses
+            all_val_losses[i] = val_losses
+            all_test_losses[i] = test_losses
+            all_train_metrics[i] = train_metrics
+            all_val_metrics[i] = val_metrics
+            all_test_metrics[i] = test_metrics
+
+        return all_train_losses, all_val_losses, all_test_losses, all_train_metrics, all_val_metrics, all_test_metrics
+
+
+    def calc_metric(self, y_true, y_pred):
+        y_true = torch.cat(y_true, dim=0)
+        y_pred = torch.cat(y_pred, dim=0)
+
+        if self.metric_best == 'ap':
+            if self.dataset_task_type == "classification_multilabel":
+                # TODO fix this later
+                y_pred = torch.sigmoid(y_pred)
+        elif self.metric_best == 'accuracy':
+            y_pred = torch.argmax(y_pred, dim=1)
+
+        metric = self.metric(y_true, y_pred)
+        return metric
 
 
     def cora_training(self, model, optimizer, early_stopping, epochs):
@@ -489,26 +448,6 @@ def changing_num_layers(dataset, task, model_class, nhid=64, heads=4, lr=0.001, 
     return train_accs, val_accs, test_accs
 
 
-def default_test(dataset, task, model_class, num_iterations=30, num_layer=2, nhid=64, heads=4, lr=0.001, batch_size=64, epochs=500):
-    trainer = Train(dataset=dataset, task=task, verbose=False)
-    train_accs, val_accs, test_accs = [], [], []
-    for _ in range(num_iterations):
-        _, _, _, train_acc, val_acc, test_acc = trainer(
-            model_class=model_class,
-            nhid=nhid,
-            heads=heads,
-            mlp_num=num_layer,
-            lr=lr,
-            batch_size=batch_size,
-            epochs=epochs
-        )
-        val_accs.append(val_acc)
-        test_accs.append(test_acc)
-        train_accs.append(train_acc)
-
-    return train_accs, val_accs, test_accs
-
-
 def plot_boxplot(result):
     datasets = list(result.keys())
     models = list(result[datasets[0]].keys())
@@ -621,22 +560,3 @@ def join_dataset_splits(datasets):
     datasets[0].split_idxs = split_idxs
 
     return datasets[0]
-
-
-def convert_edge_weights(data):
-    if data.edge_weight is not None:
-        data.edge_weight = data.edge_weight.float()  # Convert edge weights to float
-    if data.edge_attr is not None:
-        data.edge_attr = data.edge_attr.float()  # Convert edge attributes to float
-    return data
-
-def normalize_edge_weights(data):
-    # Example: Normalize edge weights or ensure degrees are float
-    row, col = data.edge_index
-    deg = degree(row, data.num_nodes, dtype=torch.float)  # Ensure degree is float
-    return data
-
-def compute_f1(pred, true):
-    pred = pred.cpu().numpy()
-    true = true.cpu().numpy()
-    return f1_score(true, pred, average='macro')
