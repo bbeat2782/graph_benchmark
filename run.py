@@ -8,26 +8,26 @@ from src.models.gin import GIN
 from src.models.gat import GAT
 
 # TODO
-# 1. Use one training function for Cora too
-# 2. code for testing multiple layers
-# 3. make .yaml files for Cora
-# 4. run with Cora
-# 5. make use of graph_pooling, dropout, clip_grad_norm, weight_decay
-# 6. make a separate function that saves a plot using result.json
-# 7. Copy GraphGPS code??
-# 8. clean earlystopping
+# 1. code for testing multiple layers
+# 2. make use of graph_pooling, dropout, clip_grad_norm, weight_decay
+# 3. make a separate function that saves a plot using result.json
+# 4. Copy GraphGPS code??
+# 5. clean earlystopping
 
 
 def main():
     model_dataset_to_evaluate = [
+        'configs/GCN/GCN_cora.yaml',
+        'configs/GIN/GIN_cora.yaml',
+        'configs/GAT/GAT_cora.yaml',
         'configs/GCN/GCN_enzymes.yaml',
-        'configs/GIN/GIN_enzymes.yaml',
-        'configs/GAT/GAT_enzymes.yaml',
-        'configs/GCN/GCN_imdb_binary.yaml',
+        # 'configs/GIN/GIN_enzymes.yaml',
+        # 'configs/GAT/GAT_enzymes.yaml',
+        # 'configs/GCN/GCN_imdb_binary.yaml',
         'configs/GIN/GIN_imdb_binary.yaml',
-        'configs/GAT/GAT_imdb_binary.yaml',
-        'configs/GCN/GCN_peptides-func.yaml',
-        'configs/GIN/GIN_peptides-func.yaml',
+        # 'configs/GAT/GAT_imdb_binary.yaml',
+        # 'configs/GCN/GCN_peptides-func.yaml',
+        # 'configs/GIN/GIN_peptides-func.yaml',
         'configs/GAT/GAT_peptides-func.yaml',
     ]
 
@@ -66,19 +66,6 @@ def main():
 
     return None
 
-        
-
-    # # Experiment 1
-    # result = {}
-    # for dataset, task in zip(datasets, tasks):
-    #     result[dataset] = {}
-    #     for model, name in zip([GCN, GIN, GAT], ['GCN', 'GIN', 'GAT']):
-    #         train_accs, val_accs, test_accs = default_test(dataset, task, model, num_iterations=30, num_layer=2, nhid=nhid, heads=heads, lr=lr, batch_size=batch_size, epochs=epochs)
-    #         result[dataset][name] = {
-    #             'train_accs': train_accs,
-    #             'val_accs': val_accs,
-    #             'test_accs': test_accs
-    #         }
 
     # plot_boxplot(result)
 

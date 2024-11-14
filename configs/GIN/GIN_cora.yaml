@@ -1,0 +1,31 @@
+out_dir: results
+metric_best: accuracy
+dataset:
+  format: PyG-Planetoid
+  name: Cora
+  task: node
+  task_type: classification
+train:
+  batch_size: 64
+  eval_period: 1
+  epochs: 500
+  repetition: 2
+  split_mode: random
+  split_ratios: [0.7, 0.15, 0.15]
+model:
+  type: GIN
+  loss_fun: negative_log_likelihood
+  graph_pooling: mean
+gnn:
+  heads: null
+  num_layer: 3
+  nhid: 64
+  dropout: 0.5
+optim:
+  clip_grad_norm: True
+  optimizer: adam
+  weight_decay: 0.0
+  base_lr: 0.001
+  scheduler: steplr
+  step_size: 50
+  gamma: 0.5

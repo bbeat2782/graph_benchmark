@@ -91,17 +91,19 @@ class Train:
         else:
             raise ValueError('Currently, it only supports dataset from PyG')
 
+        if self.model_loss_fun == 'cross_entropy':
+            self.criterion = nn.CrossEntropyLoss()
+        else:
+            raise ValueError('Please specify pre-defined loss function. Available loss function(s) are cross_entropy')
+
         self.nfeat = self.dataset.num_features
         self.nclass = self.dataset.num_classes
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         loss_mapping = {
             'cross_entropy': nn.CrossEntropyLoss(),
-            'negative_log_likelihood': nn.NLLLoss(),
+            'negative_log_likelihood': 
         }
-        self.criterion = loss_mapping.get(self.model_loss_fun)
-        if self.criterion is None:
-            raise ValueError(f'Unsupported loss function: {self.model_loss_fun}')
 
         model_mapping = {
             'GCN': GCN,
@@ -138,17 +140,16 @@ class Train:
         if self.scheduler is None:
             raise ValueError(f'Unsupported scheduler type: {self.optim_scheduler}')
 
-        # if there is only 1 graph in self.dataset eg. Cora from PyG-Planetoid
-        if self.dataset_task == 'node':
-            self.dataset = self.dataset[0]
-            self.dataset_length = self.dataset.y.size(0)
-        else:
-            self.dataset_length = len(self.dataset)
+        self.dataset_length = len(self.dataset)
+        
 
 
     def __call__(self):
-        if self.dataset_name in ['Peptides-func', 'ENZYMES', 'IMDB-BINARY', 'Cora']:
+        if self.dataset_name in ['Peptides-func', 'ENZYMES', 'IMDB-BINARY']:
             return self.training()
+        elif self.dataset_name == 'CORA':
+            # TODO
+            return self.cora_training(model, optimizer, early_stopping, epochs)
         else:
             raise ValueError(f"Unsupported dataset: {self.dataset_name}")
 
@@ -198,32 +199,13 @@ class Train:
             val_size = int(self.train_split_ratios[1] * self.dataset_length)
             test_size = self.dataset_length - train_size - val_size
 
-            # For Cora from PyG-Planetoid
-            if self.dataset_task == 'node':
-                self.dataset.to(self.device)
-                indices = torch.randperm(self.dataset_length)
-                train_indices = indices[:train_size]
-                val_indices = indices[train_size:train_size + val_size]
-                test_indices = indices[train_size + val_size:]
+            train_set, val_set, test_set = random_split(
+                 self.dataset, [train_size, val_size, test_size]
+            )
 
-                # Initialize the masks
-                self.dataset.train_mask = torch.zeros(self.dataset_length, dtype=torch.bool).to(self.device)
-                self.dataset.val_mask = torch.zeros(self.dataset_length, dtype=torch.bool).to(self.device)
-                self.dataset.test_mask = torch.zeros(self.dataset_length, dtype=torch.bool).to(self.device)
-
-                # Set the masks based on the split indices
-                self.dataset.train_mask[train_indices] = True
-                self.dataset.val_mask[val_indices] = True
-                self.dataset.test_mask[test_indices] = True
-            # For Enzymes, IMDB-Binary, Peptides-func
-            else:
-                train_set, val_set, test_set = random_split(
-                     self.dataset, [train_size, val_size, test_size]
-                )
-    
-                train_loader = DataLoader(train_set, batch_size=self.train_batch_size, shuffle=True)
-                val_loader = DataLoader(val_set, batch_size=self.train_batch_size, shuffle=False)
-                test_loader = DataLoader(test_set, batch_size=self.train_batch_size, shuffle=False)
+            train_loader = DataLoader(train_set, batch_size=self.train_batch_size, shuffle=True)
+            val_loader = DataLoader(val_set, batch_size=self.train_batch_size, shuffle=False)
+            test_loader = DataLoader(test_set, batch_size=self.train_batch_size, shuffle=False)
     
             train_losses, val_losses, test_losses = [], [], []
             train_metrics, val_metrics, test_metrics = [], [], []
@@ -232,78 +214,54 @@ class Train:
                 model.train()
                 total_loss = 0
                 y_true_train, y_pred_train = [], []
-
-                if self.dataset_task == 'node':
+    
+                # Training loop
+                for batch in train_loader:
+                    batch.x = batch.x.float()
+                    batch = batch.to(self.device)
+    
                     optimizer.zero_grad()
-                    out = model(self.dataset)
-                    #loss = self.criterion(out[self.dataset.train_mask], self.dataset.y[self.dataset.train_mask])
-
-                    train_loss, train_metric = self.calc_loss_metric(out, self.dataset.train_mask)
-                    val_loss, val_metric = self.calc_loss_metric(out, self.dataset.val_mask)
-                    test_loss, test_metric = self.calc_loss_metric(out, self.dataset.test_mask)
-                    
-                    train_losses.append(train_loss.item())
-                    train_metrics.append(train_metric)
-                    val_losses.append(val_loss.item())
-                    val_metrics.append(val_metric)
-                    test_losses.append(test_loss.item())
-                    test_metrics.append(test_metric)
-
-                    train_loss.backward()
+    
+                    # Forward pass
+                    out = model(batch, task=self.dataset_task)
+                    loss = self.criterion(out, batch.y)
+                    loss.backward()
                     optimizer.step()
-
-                elif self.dataset_task == 'graph':
-                    # Training loop
-                    for batch in train_loader:
-                        batch.x = batch.x.float()
+    
+                    total_loss += loss.item()
+                    y_true_train.append(batch.y.cpu())
+                    y_pred_train.append(out.detach().cpu())
+    
+                train_losses.append(total_loss / len(train_loader))
+                train_metrics.append(self.calc_metric(y_true_train, y_pred_train))
+    
+                model.eval()
+                val_loss = 0.0
+                y_true_val, y_pred_val = [], []
+                test_loss = 0.0
+                y_true_test, y_pred_test = [], []
+                with torch.no_grad():
+                    for batch in val_loader:
                         batch = batch.to(self.device)
-        
-                        optimizer.zero_grad()
-        
-                        # Forward pass
                         out = model(batch, task=self.dataset_task)
                         loss = self.criterion(out, batch.y)
-                        loss.backward()
-                        optimizer.step()
-        
-                        total_loss += loss.item()
-                        y_true_train.append(batch.y.cpu())
-                        y_pred_train.append(out.detach().cpu())
-        
-                    train_losses.append(total_loss / len(train_loader))
-                    train_metrics.append(self.calc_metric(y_true_train, y_pred_train))
-
-                    # Validation loop
-                    model.eval()
-                    val_loss = 0.0
-                    y_true_val, y_pred_val = [], []
-                    test_loss = 0.0
-                    y_true_test, y_pred_test = [], []
-                    with torch.no_grad():
-                        for batch in val_loader:
-                            batch = batch.to(self.device)
-                            out = model(batch, task=self.dataset_task)
-                            loss = self.criterion(out, batch.y)
-                            val_loss += loss.item()
-                            y_true_val.append(batch.y.cpu())
-                            y_pred_val.append(out.detach().cpu())
-        
-                        for batch in test_loader:
-                            batch = batch.to(self.device)
-                            out = model(batch, task=self.dataset_task)
-                            loss = self.criterion(out, batch.y)
-                            test_loss += loss.item()
-                            y_true_test.append(batch.y.cpu())
-                            y_pred_test.append(out.detach().cpu())
+                        val_loss += loss.item()
+                        y_true_val.append(batch.y.cpu())
+                        y_pred_val.append(out.detach().cpu())
     
-                    val_losses.append(val_loss)
-                    test_losses.append(test_loss)
-        
-                    val_metrics.append(self.calc_metric(y_true_val, y_pred_val))
-                    test_metrics.append(self.calc_metric(y_true_test, y_pred_test))
-                # elif link prediction task?
-                else:
-                    raise ValueError(f'Unsupported task: {self.dataset_task}')
+                    for batch in test_loader:
+                        batch = batch.to(self.device)
+                        out = model(batch, task=self.dataset_task)
+                        loss = self.criterion(out, batch.y)
+                        test_loss += loss.item()
+                        y_true_test.append(batch.y.cpu())
+                        y_pred_test.append(out.detach().cpu())
+
+                val_losses.append(val_loss)
+                test_losses.append(test_loss)
+    
+                val_metrics.append(self.calc_metric(y_true_val, y_pred_val))
+                test_metrics.append(self.calc_metric(y_true_test, y_pred_test))
 
                 if epoch%5 == 0:
                     print('epoch:', epoch+1)
@@ -330,10 +288,8 @@ class Train:
 
 
     def calc_metric(self, y_true, y_pred):
-        # if using batch loading when doing graph classification
-        if self.dataset_task == 'graph':
-            y_true = torch.cat(y_true, dim=0)
-            y_pred = torch.cat(y_pred, dim=0)
+        y_true = torch.cat(y_true, dim=0)
+        y_pred = torch.cat(y_pred, dim=0)
 
         if self.metric_best == 'ap':
             if self.dataset_task_type == "classification_multilabel":
@@ -342,19 +298,81 @@ class Train:
         elif self.metric_best == 'accuracy':
             y_pred = torch.argmax(y_pred, dim=1)
 
-        metric = self.metric(y_true.cpu().numpy(), y_pred.cpu().numpy())
+        metric = self.metric(y_true, y_pred)
         return metric
 
-    
-    def calc_loss_metric(self, out, mask):
-        mask_out = out[mask]
-        mask_loss = self.criterion(
-            mask_out, self.dataset.y[mask]
-        )
-        mask_metric = self.calc_metric(
-            self.dataset.y[mask], mask_out
-        )
-        return mask_loss, mask_metric
+
+    def cora_training(self, model, optimizer, early_stopping, epochs):
+        data = self.dataset[0].to(self.device)
+        train_history, val_history, val_accs = [], [], []
+        
+        # Set the split ratios for training, validation, and test sets
+        num_nodes = data.y.size(0)
+        train_size = int(0.7 * num_nodes)
+        val_size = int(0.15 * num_nodes)
+        test_size = num_nodes - train_size - val_size
+        
+        # Randomly split indices for each mask
+        indices = torch.randperm(num_nodes)
+        train_indices = indices[:train_size]
+        val_indices = indices[train_size:train_size + val_size]
+        test_indices = indices[train_size + val_size:]
+        
+        # Initialize the masks
+        data.train_mask = torch.zeros(num_nodes, dtype=torch.bool).to(self.device)
+        data.val_mask = torch.zeros(num_nodes, dtype=torch.bool).to(self.device)
+        data.test_mask = torch.zeros(num_nodes, dtype=torch.bool).to(self.device)
+        
+        # Set the masks based on the split indices
+        data.train_mask[train_indices] = True
+        data.val_mask[val_indices] = True
+        data.test_mask[test_indices] = True
+        
+        for epoch in range(epochs):
+            model.train()
+
+            
+            optimizer.zero_grad()
+            out = model(data)
+            loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
+            pred = out[data.val_mask].argmax(dim=1)
+            correct = int((pred == data.y[data.val_mask]).sum())
+
+            train_history.append(loss.item())
+            val_accs.append(correct / len(pred))
+            
+            loss.backward()
+            optimizer.step()
+
+            if self.verbose and epoch % 10 == 0:
+                print(f'{epoch}: {loss.item()}')
+
+            model.eval()
+            with torch.no_grad():
+                val_loss = F.nll_loss(out[data.val_mask], data.y[data.val_mask])
+                val_history.append(val_loss.item())
+                early_stopping(val_loss, model)
+                if early_stopping.early_stop:
+                    # print(f'Early stopping triggered after {epoch+1} epochs.')
+                    break
+
+        #model.load_state_dict(torch.load(f'{early_stopping.prefix_path}/{early_stopping.fname}', weights_only=True))
+        best_model_state = early_stopping.get_best_model()
+        model.load_state_dict(best_model_state)
+        model.eval()
+        pred = model(data).argmax(dim=1)
+        correct = (pred[data.test_mask] == data.y[data.test_mask]).sum()
+        test_acc = int(correct) / len(pred[data.test_mask])
+
+        correct = (pred[data.val_mask] == data.y[data.val_mask]).sum()
+        val_acc = int(correct) / len(pred[data.val_mask])
+
+        correct = (pred[data.train_mask] == data.y[data.train_mask]).sum()
+        train_acc = int(correct) / len(pred[data.train_mask])
+        # print(f'Test Accuracy: {test_acc}')
+        if self.plot:
+            self.plot_training_metrics(train_history, val_history, val_accs, f'{self.dataset_name}_{model._get_name()}')
+        return train_history, val_history, val_accs, train_acc, val_acc, test_acc
 
 
 def setup_seed(seed=42):
