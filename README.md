@@ -14,7 +14,7 @@ dataset:
 
 ## Running the project
 
-After correctly including paths to the .yaml files, you will be able to run the project by
+After correctly including paths to the .yaml files in `run.py`, you will be able to run the project by
 
 ```
 python run.py
@@ -23,3 +23,7 @@ python run.py
 ### Building the project stages using `run.py`
 
 ## Reference
+
+This project uses GraphGPS code from the [`GraphGPS`](https://github.com/rampasek/GraphGPS) repository. The original code has been modified to fit the specific requirements and functionality of this implementation.
+
+For more details about the original implementation, please visit the official repository: [https://github.com/rampasek/GraphGPS](https://github.com/rampasek/GraphGPS).

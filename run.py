@@ -21,11 +21,13 @@ from graphgps.logger import create_logger
 
 
 # TODO
-# 1. code for testing multiple layers
+# 1. Test with all .yaml files enabled (default comparing with 4 models and 4 datasets & changing number of layers with 4 models and 4 datasets --> though not sure how should I change layers for GraphGPS, change gt_layers?)
 # 2. Check whether random split for gps-peptides is working as expected
 # 3. make a separate function that saves a plot using result.json
 # 4. make use of graph_pooling, dropout, clip_grad_norm, weight_decay
-# 5. clean earlystopping
+# 5. clean earlystopping (currently, not using save checkpoint feature so can remove it)
+# 6. Clean code that creates unnecessary folders/files
+# Later, possibly clean code overall using https://pytorch-geometric.readthedocs.io/en/2.5.2/advanced/graphgym.html
 
 def custom_set_out_dir(cfg, cfg_fname, name_tag):
     """Set custom main output directory path to cfg.
@@ -59,14 +61,18 @@ def custom_set_run_dir(cfg, run_id):
 
 def main():
     model_dataset_to_evaluate = [
-        'configs/GraphGPS/GPS_peptides-func.yaml',
+        'configs/GCN/GCN_peptides-func_change_num_layers.yaml',
+        'configs/GCN/GCN_cora_change_num_layers.yaml',
+        'configs/GCN/GCN_enzymes_change_num_layers.yaml',
+        'configs/GCN/GCN_imdb_binary_change_num_layers.yaml',
+        # 'configs/GraphGPS/GPS_peptides-func.yaml',
         # 'configs/GCN/GCN_cora.yaml',
-        'configs/GIN/GIN_cora.yaml',
+        # 'configs/GIN/GIN_cora.yaml',
         # 'configs/GAT/GAT_cora.yaml',
         # 'configs/GCN/GCN_enzymes.yaml',
         # 'configs/GIN/GIN_enzymes.yaml',
-        'configs/GAT/GAT_enzymes.yaml',
-        'configs/GCN/GCN_imdb_binary.yaml',
+        # 'configs/GAT/GAT_enzymes.yaml',
+        # 'configs/GCN/GCN_imdb_binary.yaml',
         # 'configs/GIN/GIN_imdb_binary.yaml',
         # 'configs/GAT/GAT_imdb_binary.yaml',
         # 'configs/GCN/GCN_peptides-func.yaml',
@@ -113,14 +119,26 @@ def main():
             trainer = Train(config)
         # TODO need an extra function to get the best metric using val_loss
         train_losses, val_losses, test_losses, train_metrics, val_metrics, test_metrics = trainer()
-        result[dataset_name][model_name] = {
-            'train_losses': train_losses,
-            'val_losses': val_losses,
-            'test_losses': test_losses,
-            f'train_{metric}s': train_metrics,
-            f'val_{metric}s': val_metrics,
-            f'test_{metric}s': test_metrics
-        }
+        if 'gnn' in config and 'num_layers' in config['gnn'] and isinstance(config['gnn']['num_layers'], list):
+            if model_name not in result[dataset_name]:
+                result[dataset_name][model_name] = {}
+            result[dataset_name][model_name]['change_num_layers'] = {
+                'train_losses': train_losses,
+                'val_losses': val_losses,
+                'test_losses': test_losses,
+                f'train_{metric}s': train_metrics,
+                f'val_{metric}s': val_metrics,
+                f'test_{metric}s': test_metrics
+            }
+        else:
+            result[dataset_name][model_name] = {
+                'train_losses': train_losses,
+                'val_losses': val_losses,
+                'test_losses': test_losses,
+                f'train_{metric}s': train_metrics,
+                f'val_{metric}s': val_metrics,
+                f'test_{metric}s': test_metrics
+            }
 
 
     output_file = "results/result_testing.json"

@@ -76,8 +76,10 @@ class Train:
             if self.dataset_class == 'LRGBDataset':
                 # TODO need to check if others also have train/val/test structure
                 if self.dataset_name == 'Peptides-func':
-                    self.dataset = join_dataset_splits([loader.dataset for loader in loaders])
-                    # self.dataset = join_dataset_splits([LRGBDataset(f'/tmp/{self.dataset_name}', name=self.dataset_name, split=split, transform=EnsureFloatTransform()) for split in ['train', 'val', 'test']])
+                    if self.model_type == 'GPSModel':
+                        self.dataset = join_dataset_splits([loader.dataset for loader in loaders])
+                    else:
+                        self.dataset = join_dataset_splits([LRGBDataset(f'/tmp/{self.dataset_name}', name=self.dataset_name, split=split, transform=EnsureFloatTransform()) for split in ['train', 'val', 'test']])
                 else:
                     self.dataset = LRGBDataset(root=f'/tmp/{self.dataset_name}', name=self.dataset_name)
             elif self.dataset_class == 'TUDataset':
@@ -151,6 +153,8 @@ class Train:
 
     def __call__(self):
         if self.dataset_name in ['Peptides-func', 'ENZYMES', 'IMDB-BINARY', 'Cora']:
+            if hasattr(self, 'gnn_num_layers') and isinstance(self.gnn_num_layers, list):
+                return self.change_num_layer_training()
             return self.training()
         else:
             raise ValueError(f"Unsupported dataset: {self.dataset_name}")
@@ -179,6 +183,21 @@ class Train:
         plt.tight_layout()
         plt.savefig(f'figures/{base_filename}_accuracy.png')
         plt.close()
+
+
+    def change_num_layer_training(self):
+        all_train_losses, all_val_losses, all_test_losses, all_train_metrics, all_val_metrics, all_test_metrics = {}, {}, {}, {}, {}, {}
+        for num_layer in self.gnn_num_layers:
+            self.gnn_num_layer = num_layer
+            train_losses, val_losses, test_losses, train_metrics, val_metrics, test_metrics = self.training()
+            all_train_losses[num_layer] = train_losses
+            all_val_losses[num_layer] = val_losses
+            all_test_losses[num_layer] = test_losses
+            all_train_metrics[num_layer] = train_metrics
+            all_val_metrics[num_layer] = val_metrics
+            all_test_metrics[num_layer] = test_metrics
+
+        return all_train_losses, all_val_losses, all_test_losses, all_train_metrics, all_val_metrics, all_test_metrics
 
 
     def training(self):
