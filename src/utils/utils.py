@@ -18,6 +18,7 @@ from ..models.gcn import GCN
 from ..models.gin import GIN
 from ..models.gat import GAT
 from .split_generator import prepare_splits
+from torch_geometric.graphgym.model_builder import create_model
 
 
 class CustomDataset(Dataset):
@@ -56,7 +57,7 @@ class EnsureFloatTransform(BaseTransform):
 
 
 class Train:
-    def __init__(self, config):
+    def __init__(self, config, loaders=None):
         self.config = config
     
         # Dynamically set all variables from config as attributes
@@ -75,7 +76,8 @@ class Train:
             if self.dataset_class == 'LRGBDataset':
                 # TODO need to check if others also have train/val/test structure
                 if self.dataset_name == 'Peptides-func':
-                    self.dataset = join_dataset_splits([LRGBDataset(f'/tmp/{self.dataset_name}', name=self.dataset_name, split=split, transform=EnsureFloatTransform()) for split in ['train', 'val', 'test']])
+                    self.dataset = join_dataset_splits([loader.dataset for loader in loaders])
+                    # self.dataset = join_dataset_splits([LRGBDataset(f'/tmp/{self.dataset_name}', name=self.dataset_name, split=split, transform=EnsureFloatTransform()) for split in ['train', 'val', 'test']])
                 else:
                     self.dataset = LRGBDataset(root=f'/tmp/{self.dataset_name}', name=self.dataset_name)
             elif self.dataset_class == 'TUDataset':
@@ -107,6 +109,7 @@ class Train:
             'GCN': GCN,
             'GIN': GIN,
             'GAT': GAT,
+            'GPSModel': 'GPSModel',
         }
         self.model_class = model_mapping.get(self.model_type)
         if self.model_class is None:
@@ -184,7 +187,16 @@ class Train:
 
         for i in range(self.train_repetition):
             # TODO add dropout later
-            model = self.model_class(self.nfeat, self.gnn_nhid, self.nclass, self.gnn_num_layer, heads=self.gnn_heads).to(self.device)
+            if self.model_type == 'GPSModel':
+                model = create_model()
+            else:
+                model = self.model_class(
+                    self.nfeat, 
+                    self.gnn_nhid, 
+                    self.nclass, 
+                    self.gnn_num_layer, 
+                    heads=self.gnn_heads
+                ).to(self.device)
             optimizer = self.optimizer(model.parameters(), lr=self.optim_base_lr)
             early_stopping = EarlyStoppingLoss(patience=100, fname=f'{self.dataset_name}_{self.model_type}_{self.gnn_num_layer}_layers_best_model.pth')
             # TODO need a dedicated function to handle different scheduler with different configurations
@@ -236,7 +248,6 @@ class Train:
                 if self.dataset_task == 'node':
                     optimizer.zero_grad()
                     out = model(self.dataset)
-                    #loss = self.criterion(out[self.dataset.train_mask], self.dataset.y[self.dataset.train_mask])
 
                     train_loss, train_metric = self.calc_loss_metric(out, self.dataset.train_mask)
                     val_loss, val_metric = self.calc_loss_metric(out, self.dataset.val_mask)
@@ -261,7 +272,11 @@ class Train:
                         optimizer.zero_grad()
         
                         # Forward pass
-                        out = model(batch, task=self.dataset_task)
+                        if self.model_type == 'GPSModel':
+                            out = model(batch)
+                            out, _ = out
+                        else:
+                            out = model(batch, task=self.dataset_task)
                         loss = self.criterion(out, batch.y)
                         loss.backward()
                         optimizer.step()
@@ -282,7 +297,11 @@ class Train:
                     with torch.no_grad():
                         for batch in val_loader:
                             batch = batch.to(self.device)
-                            out = model(batch, task=self.dataset_task)
+                            if self.model_type == 'GPSModel':
+                                out = model(batch)
+                                out, _ = out
+                            else:
+                                out = model(batch, task=self.dataset_task)
                             loss = self.criterion(out, batch.y)
                             val_loss += loss.item()
                             y_true_val.append(batch.y.cpu())
@@ -290,7 +309,11 @@ class Train:
         
                         for batch in test_loader:
                             batch = batch.to(self.device)
-                            out = model(batch, task=self.dataset_task)
+                            if self.model_type == 'GPSModel':
+                                out = model(batch)
+                                out, _ = out
+                            else:
+                                out = model(batch, task=self.dataset_task)
                             loss = self.criterion(out, batch.y)
                             test_loss += loss.item()
                             y_true_test.append(batch.y.cpu())

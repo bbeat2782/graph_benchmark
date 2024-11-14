@@ -1,7 +1,7 @@
 out_dir: results
 metric_best: ap
 wandb:
-  use: True
+  use: False
   project: peptides-func
 dataset:
   format: PyG-LRGBDataset
@@ -27,6 +27,10 @@ train:
   batch_size: 128
   eval_period: 1
   ckpt_period: 100
+  epochs: 10
+  repetition: 2
+  split_mode: random
+  split_ratios: [0.7, 0.15, 0.15]
 model:
   type: GPSModel
   loss_fun: cross_entropy
@@ -48,11 +52,14 @@ gnn:
   batchnorm: True
   act: relu
   dropout: 0.0
+  num_layer: not_specified
 optim:
   clip_grad_norm: True
   optimizer: adamW
   weight_decay: 0.0
   base_lr: 0.0003
   max_epoch: 200
-  scheduler: cosine_with_warmup
+  scheduler: steplr
   num_warmup_epochs: 10
+  step_size: 50
+  gamma: 0.5

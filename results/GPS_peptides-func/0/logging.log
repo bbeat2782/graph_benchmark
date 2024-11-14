@@ -1,0 +1,12 @@
+[*] Loaded dataset 'Peptides-func' from 'PyG-LRGBDataset':
+  Data(x=[2344859, 9], edge_index=[2, 4773974], edge_attr=[4773974, 3], y=[15535, 10])
+  undirected: True
+  num graphs: 15535
+  avg num_nodes/graph: 150
+  num node features: 9
+  num edge features: 3
+  num classes: 10
+Parsed RWSE PE kernel times / steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+Precomputing Positional Encoding statistics: ['RWSE'] for all graphs...
+  ...estimated to be undirected: True
+Done! Took 00:00:29.69
