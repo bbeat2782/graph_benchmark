@@ -1,31 +1,31 @@
 out_dir: results
-metric_best: ap
+metric_best: accuracy
 dataset:
-  format: PyG-LRGBDataset
-  name: Peptides-func
-  task: graph
-  task_type: classification_multilabel
+  format: PyG-Planetoid
+  name: Cora
+  task: node
+  task_type: classification
 train:
-  batch_size: 128
+  batch_size: 64
   eval_period: 1
   epochs: 500
   repetition: 2
   split_mode: random
   split_ratios: [0.7, 0.15, 0.15]
 model:
-  type: GCN
-  loss_fun: cross_entropy
+  type: GAT
+  loss_fun: negative_log_likelihood
   graph_pooling: mean
 gnn:
-  heads: null
+  heads: 5
   num_layers: [1, 2, 3, 4, 5, 6]
-  nhid: 96
+  nhid: 64
   dropout: 0.5
 optim:
   clip_grad_norm: True
-  optimizer: adamW
+  optimizer: adam
   weight_decay: 0.0
-  base_lr: 0.0003
+  base_lr: 0.001
   scheduler: steplr
   step_size: 50
   gamma: 0.5

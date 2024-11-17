@@ -8,7 +8,7 @@ dataset:
 train:
   batch_size: 128
   eval_period: 1
-  epochs: 20
+  epochs: 500
   repetition: 2
   split_mode: random
   split_ratios: [0.7, 0.15, 0.15]

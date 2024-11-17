@@ -28,7 +28,7 @@ train:
   batch_size: 64
   eval_period: 1
   ckpt_period: 100
-  epochs: 200
+  epochs: 500
   repetition: 2
   split_mode: random
   split_ratios: [0.7, 0.15, 0.15]

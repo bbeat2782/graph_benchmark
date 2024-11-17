@@ -13,11 +13,11 @@ train:
   split_mode: random
   split_ratios: [0.7, 0.15, 0.15]
 model:
-  type: GCN
+  type: GAT
   loss_fun: cross_entropy
   graph_pooling: mean
 gnn:
-  heads: null
+  heads: 4
   num_layers: [1, 2, 3, 4, 5, 6]
   nhid: 96
   dropout: 0.5
