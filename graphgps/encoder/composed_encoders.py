@@ -56,6 +56,7 @@ def concat_node_encoders(encoder_classes, pe_enc_names):
             batch.x = batch.x.long()
             batch = self.encoder1(batch)
             # print(batch)
+            
             batch = self.encoder2(batch)
             return batch
 

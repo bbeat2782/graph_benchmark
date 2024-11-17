@@ -17,8 +17,9 @@ from torch_geometric.transforms import BaseTransform
 from ..models.gcn import GCN
 from ..models.gin import GIN
 from ..models.gat import GAT
-from .split_generator import prepare_splits
 from torch_geometric.graphgym.model_builder import create_model
+from torch_geometric.utils import add_self_loops
+from copy import deepcopy
 
 
 class CustomDataset(Dataset):
@@ -38,6 +39,23 @@ class CustomDataset(Dataset):
     def get(self, idx):
         return self.data_list[idx]
 
+
+class ModifiedDataset(InMemoryDataset):
+    def __init__(self, original_dataset):
+        # Initialize the parent InMemoryDataset
+        super().__init__(root=original_dataset.root)
+        # Modify each graph in the original dataset
+        modified_data_list = [self.modify_data(data) for data in original_dataset]
+        # Collate the modified graphs into a single dataset object
+        self.data, self.slices = self.collate(modified_data_list)
+
+    def modify_data(self, data):
+        # Add default edge attributes if missing
+        if data.edge_attr is None:
+            num_edges = data.edge_index.shape[1]
+            data.edge_attr = torch.ones((num_edges, 1))  # Example: All edge weights = 1
+        data.edge_attr = data.edge_attr.long()
+        return data
 
 class EnsureFloatTransform(BaseTransform):
     def __call__(self, data):
@@ -59,6 +77,7 @@ class EnsureFloatTransform(BaseTransform):
 class Train:
     def __init__(self, config, loaders=None):
         self.config = config
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
         # Dynamically set all variables from config as attributes
         for section, params in config.items():
@@ -73,35 +92,48 @@ class Train:
 
         if self.dataset_format.startswith('PyG-'):
             self.dataset_class = self.dataset_format.split('-')[1]
-            if self.dataset_class == 'LRGBDataset':
-                # TODO need to check if others also have train/val/test structure
+
+            # Special case for GPS model
+            if self.model_type == 'GPSModel':
                 if self.dataset_name == 'Peptides-func':
-                    if self.model_type == 'GPSModel':
-                        self.dataset = join_dataset_splits([loader.dataset for loader in loaders])
-                    else:
-                        self.dataset = join_dataset_splits([LRGBDataset(f'/tmp/{self.dataset_name}', name=self.dataset_name, split=split, transform=EnsureFloatTransform()) for split in ['train', 'val', 'test']])
+                    self.dataset = join_dataset_splits([loader.dataset for loader in loaders])
+                elif self.dataset_class == 'TUDataset':
+                    self.dataset = ModifiedDataset(join_dataset_splits([loader.dataset for loader in loaders]))
+                elif self.dataset_name == 'Cora':
+                    
+                    self.dataset = join_dataset_splits([loader.dataset for loader in loaders])
+                    self.original_dataset = deepcopy(self.dataset).to(self.device)
                 else:
-                    self.dataset = LRGBDataset(root=f'/tmp/{self.dataset_name}', name=self.dataset_name)
-            elif self.dataset_class == 'TUDataset':
-                if self.dataset_name == 'IMDB-BINARY':
-                    # since IMDB-BINARY does not have node features, node degree is added as node feature
-                    self.dataset = CustomDataset(root='/tmp/IMDB-BINARY', name='IMDB-BINARY')
-                else:
-                    self.dataset = TUDataset(root=f'/tmp/{self.dataset_name}', name=self.dataset_name)
-            elif self.dataset_class == 'Planetoid':
-                self.dataset = Planetoid(root=f'/tmp/{self.dataset_name}', name=self.dataset_name)
+                    raise ValueError('not implemented')
+
+            # For MPNN model
             else:
-                raise ValueError(f'{self.dataset_name} from {self.dataset_format} is not supported')
+                if self.dataset_class == 'LRGBDataset':
+                    # TODO need to check if others also have train/val/test structure
+                    if self.dataset_name == 'Peptides-func':
+                        self.dataset = join_dataset_splits([LRGBDataset(f'/tmp/{self.dataset_name}', name=self.dataset_name, split=split, transform=EnsureFloatTransform()) for split in ['train', 'val', 'test']])
+                    # NOTE This else part has not been tested
+                    else:
+                        self.dataset = LRGBDataset(root=f'/tmp/{self.dataset_name}', name=self.dataset_name)
+                elif self.dataset_class == 'TUDataset':
+                    if self.dataset_name == 'IMDB-BINARY':
+                        # since IMDB-BINARY does not have node features, node degree is added as node feature
+                        self.dataset = CustomDataset(root='/tmp/IMDB-BINARY', name='IMDB-BINARY')
+                    else:
+                        self.dataset = TUDataset(root=f'/tmp/{self.dataset_name}', name=self.dataset_name)
+                elif self.dataset_class == 'Planetoid':
+                    self.dataset = Planetoid(root=f'/tmp/{self.dataset_name}', name=self.dataset_name)
+                else:
+                    raise ValueError(f'{self.dataset_name} from {self.dataset_format} is not supported')
         else:
             raise ValueError('Currently, it only supports dataset from PyG')
 
         self.nfeat = self.dataset.num_features
         self.nclass = self.dataset.num_classes
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
         loss_mapping = {
             'cross_entropy': nn.CrossEntropyLoss(),
             'negative_log_likelihood': nn.NLLLoss(),
+            'bce': nn.BCEWithLogitsLoss(),
         }
         self.criterion = loss_mapping.get(self.model_loss_fun)
         if self.criterion is None:
@@ -159,6 +191,14 @@ class Train:
         else:
             raise ValueError(f"Unsupported dataset: {self.dataset_name}")
 
+    def add_default_edge_attr(self, dataset):
+        for data in dataset:
+            if data.edge_attr is None:
+                num_edges = data.edge_index.shape[1]
+                data.edge_attr = torch.ones((num_edges, 1))  # Example: All edge weights = 1
+            # Ensure edge_attr has the correct shape for your model
+            data.edge_attr = data.edge_attr.float()
+        return dataset
 
     def plot_training_metrics(self, train_history, val_history, val_accs, base_filename):
         # Training and Validation Loss
@@ -251,6 +291,7 @@ class Train:
                 train_set, val_set, test_set = random_split(
                      self.dataset, [train_size, val_size, test_size]
                 )
+
     
                 train_loader = DataLoader(train_set, batch_size=self.train_batch_size, shuffle=True)
                 val_loader = DataLoader(val_set, batch_size=self.train_batch_size, shuffle=False)
@@ -260,13 +301,18 @@ class Train:
             train_metrics, val_metrics, test_metrics = [], [], []
         
             for epoch in range(self.train_epochs):
+                if self.dataset_name == 'Cora' and self.model_type == 'GPSModel':
+                    self.dataset.x = self.original_dataset[0].x.clone()
                 model.train()
                 total_loss = 0
                 y_true_train, y_pred_train = [], []
 
                 if self.dataset_task == 'node':
                     optimizer.zero_grad()
-                    out = model(self.dataset)
+                    if self.model_type == 'GPSModel':
+                        out, _ = model(self.dataset)
+                    else:
+                        out = model(self.dataset)
 
                     train_loss, train_metric = self.calc_loss_metric(out, self.dataset.train_mask)
                     val_loss, val_metric = self.calc_loss_metric(out, self.dataset.val_mask)
@@ -294,9 +340,16 @@ class Train:
                         if self.model_type == 'GPSModel':
                             out = model(batch)
                             out, _ = out
+                            if self.model_loss_fun == 'bce':
+                                out = out.squeeze()
+                                batch.y = batch.y.float()  
                         else:
                             out = model(batch, task=self.dataset_task)
+                        # print(batch.y)
+                        # print(self.criterion)
+                        # print('out: ', out)
                         loss = self.criterion(out, batch.y)
+                        # print(loss.shape)
                         loss.backward()
                         optimizer.step()
         
@@ -319,6 +372,9 @@ class Train:
                             if self.model_type == 'GPSModel':
                                 out = model(batch)
                                 out, _ = out
+                                if self.model_loss_fun == 'bce':
+                                    out = out.squeeze()
+                                    batch.y = batch.y.float()  
                             else:
                                 out = model(batch, task=self.dataset_task)
                             loss = self.criterion(out, batch.y)
@@ -331,6 +387,9 @@ class Train:
                             if self.model_type == 'GPSModel':
                                 out = model(batch)
                                 out, _ = out
+                                if self.model_loss_fun == 'bce':
+                                    out = out.squeeze()
+                                    batch.y = batch.y.float()  
                             else:
                                 out = model(batch, task=self.dataset_task)
                             loss = self.criterion(out, batch.y)
@@ -381,21 +440,48 @@ class Train:
             if self.dataset_task_type == "classification_multilabel":
                 # TODO fix this later
                 y_pred = torch.sigmoid(y_pred)
-        elif self.metric_best == 'accuracy':
-            y_pred = torch.argmax(y_pred, dim=1)
+        elif self.metric_best == 'accuracy':  # Accuracy
+            # Handle binary vs multi-class classification (using bce or ce)
+            if y_pred.ndim == 1 or (y_pred.ndim == 2 and y_pred.shape[1] == 1):
+                # Binary classification: apply sigmoid and threshold
+                y_pred = (torch.sigmoid(y_pred) > 0.5).long()
+            else:
+                # Multi-class classification: take argmax across classes
+                # even though imdb is binary, gcn, gin, gat are using cross entropy loss
+                y_pred = torch.argmax(y_pred, dim=1)
+        # elif self.metric_best == 'accuracy':
+        #     y_pred = torch.argmax(y_pred, dim=1)
 
         metric = self.metric(y_true.cpu().numpy(), y_pred.cpu().numpy())
         return metric
 
     
+    # def calc_loss_metric(self, out, mask):
+    #     mask_out = out[mask]
+    #     print(mask_out)
+    #     print(self.dataset.y[mask])
+    #     mask_loss = self.criterion(
+    #         mask_out, self.dataset.y[mask]
+    #     )
+    #     mask_metric = self.calc_metric(
+    #         self.dataset.y[mask], mask_out
+    #     )
+    #     return mask_loss, mask_metric
+
     def calc_loss_metric(self, out, mask):
+        # Check if the model type requires log_softmax
+        if self.model_type == 'GPSModel':
+            out = F.log_softmax(out, dim=1)  # Apply log_softmax for NLLLoss
+    
+        # Mask the output and labels
         mask_out = out[mask]
-        mask_loss = self.criterion(
-            mask_out, self.dataset.y[mask]
-        )
-        mask_metric = self.calc_metric(
-            self.dataset.y[mask], mask_out
-        )
+    
+        # Calculate the loss using the criterion
+        mask_loss = self.criterion(mask_out, self.dataset.y[mask])
+    
+        # Calculate the metric (e.g., accuracy)
+        mask_metric = self.calc_metric(self.dataset.y[mask], mask_out)
+    
         return mask_loss, mask_metric
 
 

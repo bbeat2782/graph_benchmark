@@ -13,7 +13,7 @@ train:
   split_mode: random
   split_ratios: [0.7, 0.15, 0.15]
 model:
-  type: GCN
+  type: GIN
   loss_fun: cross_entropy
   graph_pooling: mean
 gnn:

@@ -47,9 +47,10 @@ class FeatureEncoder(torch.nn.Module):
 
     def forward(self, batch):
         for module in self.children():
-            # print(f"batch.x[:, i]: {batch.x}")
-            # print(f"batch.x[:, i] dtype: {batch.x.dtype}")
+            #print(f"batch.x[:, i]: {batch.x}")
+            #print(f"batch.x[:, i] dtype: {batch.x.dtype}")
             batch = module(batch)
+            # print('after', batch)
         return batch
 
 

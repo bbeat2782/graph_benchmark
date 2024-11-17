@@ -43,14 +43,6 @@ class EarlyStoppingLoss:
                 print(f"EarlyStopping counter: {self.counter} out of {self.patience}")
             if self.counter >= self.patience:
                 self.early_stop = True
-
-#     def save_checkpoint(self, val_loss, model):
-#         if self.verbose:
-#             print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-
-#         file_name = f'{self.prefix_path}/{self.fname}'
-#         torch.save(model.state_dict(), file_name)
-#         self.val_loss_min = val_loss
         
     def get_best_model(self):
         return self.best_model_state

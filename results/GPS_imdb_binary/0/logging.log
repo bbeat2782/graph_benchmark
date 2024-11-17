@@ -1,0 +1,12 @@
+[*] Loaded dataset 'IMDB-BINARY' from 'PyG-TUDataset':
+  Data(edge_index=[2, 193062], y=[1000], x=[19773, 1], num_nodes=19773)
+  undirected: True
+  num graphs: 1000
+  avg num_nodes/graph: 19
+  num node features: 1
+  num edge features: 0
+  num classes: 2
+Parsed RWSE PE kernel times / steps: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+Precomputing Positional Encoding statistics: ['RWSE'] for all graphs...
+  ...estimated to be undirected: True
+Done! Took 00:00:00.80

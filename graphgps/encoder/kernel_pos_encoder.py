@@ -97,6 +97,7 @@ class KernelPENodeEncoder(torch.nn.Module):
             h = batch.x
         # Concatenate final PEs to input embedding
         batch.x = torch.cat((h, pos_enc), 1)
+
         # Keep PE also separate in a variable (e.g. for skip connections to input)
         if self.pass_as_var:
             setattr(batch, f'pe_{self.kernel_type}', pos_enc)
