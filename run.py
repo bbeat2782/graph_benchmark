@@ -21,9 +21,8 @@ from graphgps.logger import create_logger
 
 
 # TODO
-# 1. make a separate function that saves a plot using result.json
-# 2. make use of graph_pooling, dropout, clip_grad_norm, weight_decay (or just use the same for all tests)
-# 3. Clean code that creates unnecessary folders/files
+# 1. make use of graph_pooling, dropout, clip_grad_norm, weight_decay (or just use the same for all tests)
+# 2. Clean code that creates unnecessary folders/files
 # Later, possibly clean code overall using https://pytorch-geometric.readthedocs.io/en/2.5.2/advanced/graphgym.html
 
 def custom_set_out_dir(cfg, cfg_fname, name_tag):
@@ -168,23 +167,6 @@ def main():
         print(f"Results saved to {output_file}")
 
     return None
-
-
-    # plot_boxplot(result)
-
-    # # Experiment 2
-    # # Testing how different GNNs perform when number of layers changes
-    # result = {}
-    # for dataset, task in zip(datasets, tasks):
-    #     for model, name in zip([GCN, GIN, GAT], ['GCN', 'GIN', 'GAT']):
-    #         train_accs, val_accs, test_accs = changing_num_layers(dataset, task, model, nhid=nhid, heads=heads, lr=lr, batch_size=batch_size, epochs=epochs)
-    #         result[name] = {
-    #             'train_accs': train_accs,
-    #             'val_accs': val_accs,
-    #             'test_accs': test_accs
-    #         }
-
-    #     plot_accuracy(result, dataset)
 
 
 if __name__ == "__main__":
