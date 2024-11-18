@@ -245,6 +245,7 @@ class Train:
         all_train_metrics, all_val_metrics, all_test_metrics = {}, {}, {}
 
         for i in range(self.train_repetition):
+            print(f'{i}-th iteration on {self.dataset_name} with {self.model_type}')
             # TODO add dropout later
             if self.model_type == 'GPSModel':
                 model = create_model()
@@ -257,7 +258,7 @@ class Train:
                     heads=self.gnn_heads
                 ).to(self.device)
             optimizer = self.optimizer(model.parameters(), lr=self.optim_base_lr)
-            early_stopping = EarlyStoppingLoss(patience=100, fname=f'{self.dataset_name}_{self.model_type}_{self.gnn_num_layer}_layers_best_model.pth')
+            early_stopping = EarlyStoppingLoss(patience=30, fname=f'{self.dataset_name}_{self.model_type}_{self.gnn_num_layer}_layers_best_model.pth')
             # TODO need a dedicated function to handle different scheduler with different configurations
             scheduler = self.scheduler(
                 optimizer,

@@ -9,7 +9,7 @@ train:
   batch_size: 128
   eval_period: 1
   epochs: 500
-  repetition: 2
+  repetition: 5
   split_mode: random
   split_ratios: [0.7, 0.15, 0.15]
 model:
@@ -18,7 +18,7 @@ model:
   graph_pooling: mean
 gnn:
   heads: 4
-  num_layers: [1, 2, 3, 4, 5, 6]
+  num_layers: [1, 2, 3, 4, 5]
   nhid: 96
   dropout: 0.5
 optim:
@@ -27,5 +27,5 @@ optim:
   weight_decay: 0.0
   base_lr: 0.0003
   scheduler: steplr
-  step_size: 50
+  step_size: 20
   gamma: 0.5

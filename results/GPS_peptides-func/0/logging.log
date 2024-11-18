@@ -9,4 +9,4 @@
 Parsed RWSE PE kernel times / steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 Precomputing Positional Encoding statistics: ['RWSE'] for all graphs...
   ...estimated to be undirected: True
-Done! Took 00:00:31.45
+Done! Took 00:00:25.41

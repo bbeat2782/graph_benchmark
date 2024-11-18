@@ -133,7 +133,7 @@ optim:
   clip_grad_norm_value: 1.0
   gamma: 0.5
   lr_decay: 0.1
-  max_epoch: 200
+  max_epoch: 500
   min_lr: 0.0
   momentum: 0.9
   num_warmup_epochs: 50
@@ -141,7 +141,7 @@ optim:
   reduce_factor: 0.1
   schedule_patience: 10
   scheduler: steplr
-  step_size: 50
+  step_size: 20
   steps:
   - 30
   - 60
@@ -261,7 +261,7 @@ train:
   - 5
   node_per_graph: 32
   radius: extend
-  repetition: 2
+  repetition: 10
   sample_node: false
   sampler: full_batch
   skip_train_eval: false

@@ -14,13 +14,38 @@ dataset:
 
 ## Running the project
 
-After correctly including paths to the .yaml files in `run.py`, you will be able to run the project by
+The following versions are used for this project.
+
+```
+python3 -m venv graph_benchmark
+source graph_benchmark/bin/activate
+pip install ipython ipykernel
+ipython kernel install —user —name=graph_benchmark
+pip install torch==2.2.1+cu121 --index-url https://download.pytorch.org/whl/cu121
+pip install torch-geometric==2.6.1
+pip install networkx==3.3
+pip install numpy==1.26.4
+pip install scikit-learn==1.4.2
+pip install scipy==1.13.0
+pip install pyg-lib -f https://data.pyg.org/whl/torch-2.2.1+cu121.html
+pip install ogb==1.3.6
+pip install tensorboardX==2.6.2.2
+pip install performer-pytorch==1.1.4
+pip install pytorch-lightning==2.4.0
+pip install yacs==0.1.8
+pip install torchmetrics==1.5.2
+pip install matplotlib==3.9.2
+pip install torch_scatter==2.1.2
+pip install torch-scatter -f https://data.pyg.org/whl/torch-2.2.1+cu121.html
+```
+
+After correctly installing the packages and including paths to the .yaml files in `run.py`, you will be able to run the project by
 
 ```
 python run.py
 ```
 
-### Building the project stages using `run.py`
+It took about 21 hours to run the current configurations with 2080ti GPU.
 
 ## Reference
 

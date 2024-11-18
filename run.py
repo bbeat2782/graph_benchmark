@@ -21,10 +21,9 @@ from graphgps.logger import create_logger
 
 
 # TODO
-# 1. Test with all .yaml files enabled (default comparing with 4 models and 4 datasets & changing number of layers with 4 models and 4 datasets --> though not sure how should I change layers for GraphGPS, change gt_layers?)
-# 2. make a separate function that saves a plot using result.json
-# 3. make use of graph_pooling, dropout, clip_grad_norm, weight_decay
-# 4. Clean code that creates unnecessary folders/files
+# 1. make a separate function that saves a plot using result.json
+# 2. make use of graph_pooling, dropout, clip_grad_norm, weight_decay (or just use the same for all tests)
+# 3. Clean code that creates unnecessary folders/files
 # Later, possibly clean code overall using https://pytorch-geometric.readthedocs.io/en/2.5.2/advanced/graphgym.html
 
 def custom_set_out_dir(cfg, cfg_fname, name_tag):
@@ -96,6 +95,13 @@ def main():
     ]
 
     result = {}
+    output_file = "results/result.json"
+    if os.path.exists(output_file):
+        with open(output_file, "r") as f:
+            result = json.load(f)
+    else:
+        result = {}
+    
     for config_file in model_dataset_to_evaluate:
         with open(config_file, 'r') as file:
             config = yaml.safe_load(file)
@@ -156,12 +162,10 @@ def main():
                 f'test_{metric}s': test_metrics
             }
 
-
-    output_file = "results/result.json"
-    with open(output_file, "w") as f:
-        json.dump(result, f, indent=4)
-    
-    print(f"Results saved to {output_file}")
+        with open(output_file, "w") as f:
+            json.dump(result, f, indent=4)
+        
+        print(f"Results saved to {output_file}")
 
     return None
 

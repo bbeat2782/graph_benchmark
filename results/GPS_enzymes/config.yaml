@@ -61,7 +61,7 @@ gnn:
   att_heads: 1
   batchnorm: true
   clear_feature: true
-  dim_inner: 96
+  dim_inner: 64
   dropout: 0.0
   head: graph
   keep_edge: 0.5
@@ -101,13 +101,13 @@ gt:
     max_position_embeddings: 128
     num_random_blocks: 3
     use_bias: false
-  dim_hidden: 96
+  dim_hidden: 64
   dropout: 0.0
   full_graph: true
   gamma: 1.0e-05
   layer_norm: false
   layer_type: CustomGatedGCN+Transformer
-  layers: 4
+  layers: 2
   n_heads: 4
   pna_degrees: []
   residual: true
@@ -133,7 +133,7 @@ optim:
   clip_grad_norm_value: 1.0
   gamma: 0.5
   lr_decay: 0.1
-  max_epoch: 200
+  max_epoch: 500
   min_lr: 0.0
   momentum: 0.9
   num_warmup_epochs: 50
@@ -141,7 +141,7 @@ optim:
   reduce_factor: 0.1
   schedule_patience: 10
   scheduler: steplr
-  step_size: 50
+  step_size: 20
   steps:
   - 30
   - 60
@@ -250,7 +250,7 @@ train:
   ckpt_period: 100
   enable_ckpt: true
   epoch_resume: -1
-  epochs: 10
+  epochs: 500
   eval_period: 1
   iter_per_epoch: 32
   mode: custom
@@ -261,7 +261,7 @@ train:
   - 5
   node_per_graph: 32
   radius: extend
-  repetition: 2
+  repetition: 10
   sample_node: false
   sampler: full_batch
   skip_train_eval: false

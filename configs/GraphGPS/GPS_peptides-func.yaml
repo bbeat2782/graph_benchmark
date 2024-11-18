@@ -27,8 +27,8 @@ train:
   batch_size: 128
   eval_period: 1
   ckpt_period: 100
-  epochs: 10
-  repetition: 2
+  epochs: 500
+  repetition: 10
   split_mode: random
   split_ratios: [0.7, 0.15, 0.15]
 model:
@@ -58,8 +58,8 @@ optim:
   optimizer: adamW
   weight_decay: 0.0
   base_lr: 0.0003
-  max_epoch: 200
+  max_epoch: 500
   scheduler: steplr
   num_warmup_epochs: 10
-  step_size: 50
+  step_size: 20
   gamma: 0.5

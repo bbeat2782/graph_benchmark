@@ -12,3 +12,5 @@ performer-pytorch==1.1.4
 pytorch-lightning==2.4.0
 yacs==0.1.8
 torchmetrics==1.5.2
+matplotlib==3.9.2
+torch_scatter==2.1.2
