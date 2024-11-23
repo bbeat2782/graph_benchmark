@@ -8,7 +8,7 @@ dataset:
 train:
   batch_size: 64
   eval_period: 1
-  epochs: 500
+  epochs: 200
   repetition: 10
   split_mode: random
   split_ratios: [0.7, 0.15, 0.15]
@@ -26,6 +26,7 @@ optim:
   optimizer: adam
   weight_decay: 0.0
   base_lr: 0.001
-  scheduler: steplr
-  step_size: 20
-  gamma: 0.5
+  scheduler: reduce_on_plateau
+  reduce_factor: 0.5
+  schedule_patience: 5
+  min_lr: 0.00001

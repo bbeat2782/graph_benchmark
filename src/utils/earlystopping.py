@@ -28,10 +28,10 @@ class EarlyStoppingLoss:
         self.fname = fname
         self.best_model_state = None
 
-    def __call__(self, val_loss, model):
-        score = val_loss
+    def __call__(self, val_score, model):
+        score = val_score
 
-        if self.best_score is None or score < self.best_score - self.delta:
+        if self.best_score is None or score > self.best_score - self.delta:
             self.best_score = score
             self.best_model_state = model.state_dict()
             self.counter = 0

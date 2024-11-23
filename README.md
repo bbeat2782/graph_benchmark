@@ -37,6 +37,7 @@ pip install torchmetrics==1.5.2
 pip install matplotlib==3.9.2
 pip install torch_scatter==2.1.2
 pip install torch-scatter -f https://data.pyg.org/whl/torch-2.2.1+cu121.html
+pip install transformers TODO which version
 ```
 
 After correctly installing the packages and including paths to the .yaml files in `run.py`, you will be able to run the project by

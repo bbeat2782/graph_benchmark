@@ -20,6 +20,8 @@ from ..models.gat import GAT
 from torch_geometric.graphgym.model_builder import create_model
 from torch_geometric.utils import add_self_loops
 from copy import deepcopy
+from transformers import get_cosine_schedule_with_warmup
+
 
 
 class CustomDataset(Dataset):
@@ -168,12 +170,14 @@ class Train:
             raise ValueError(f'Unsupported metric type: {self.metric_best}')
 
         scheduler_mapping = {
-            'cosine_with_warmup': torch.optim.lr_scheduler.CosineAnnealingWarmRestarts,
-            'steplr': torch.optim.lr_scheduler.StepLR
+            'cosine_with_warmup': get_cosine_schedule_with_warmup,
+            'steplr': torch.optim.lr_scheduler.StepLR,
+            'reduce_on_plateau': torch.optim.lr_scheduler.ReduceLROnPlateau
         }
         self.scheduler = scheduler_mapping.get(self.optim_scheduler)
         if self.scheduler is None:
-            raise ValueError(f'Unsupported scheduler type: {self.optim_scheduler}')
+            print(f'Not using a learning rate scheduler. Using {self.optim_base_lr} for the entire training')
+            # raise ValueError(f'Unsupported scheduler type: {self.optim_scheduler}')
 
         # if there is only 1 graph in self.dataset eg. Cora from PyG-Planetoid
         if self.dataset_task == 'node':
@@ -260,11 +264,26 @@ class Train:
             optimizer = self.optimizer(model.parameters(), lr=self.optim_base_lr)
             early_stopping = EarlyStoppingLoss(patience=30, fname=f'{self.dataset_name}_{self.model_type}_{self.gnn_num_layer}_layers_best_model.pth')
             # TODO need a dedicated function to handle different scheduler with different configurations
-            scheduler = self.scheduler(
-                optimizer,
-                step_size=self.optim_step_size,
-                gamma=self.optim_gamma
-            )
+            if self.optim_scheduler == 'steplr':
+                scheduler = self.scheduler(
+                    optimizer,
+                    step_size=self.optim_step_size,
+                    gamma=self.optim_gamma
+                )
+            elif self.optim_scheduler == 'cosine_with_warmup':
+                scheduler = self.scheduler(
+                    optimizer,
+                    num_warmup_steps=self.optim_warmup_steps, 
+                    num_training_steps=self.train_epochs
+                )
+            elif self.optim_scheduler == 'reduce_on_plateau':
+                scheduler = self.scheduler(
+                    optimizer,
+                    mode='max',
+                    factor=self.optim_reduce_factor,
+                    patience=self.optim_schedule_patience,
+                    min_lr=self.optim_min_lr
+                )
 
             train_size = int(self.train_split_ratios[0] * self.dataset_length)
             val_size = int(self.train_split_ratios[1] * self.dataset_length)
@@ -400,23 +419,30 @@ class Train:
     
                     val_losses.append(val_loss)
                     test_losses.append(test_loss)
+                    val_metric = self.calc_metric(y_true_val, y_pred_val)
+                    test_metric = self.calc_metric(y_true_test, y_pred_test)
         
-                    val_metrics.append(self.calc_metric(y_true_val, y_pred_val))
-                    test_metrics.append(self.calc_metric(y_true_test, y_pred_test))
+                    val_metrics.append(val_metric)
+                    test_metrics.append(test_metric)
                 # elif link prediction task?
                 else:
                     raise ValueError(f'Unsupported task: {self.dataset_task}')
 
-                if epoch%5 == 0:
+                if epoch%1 == 0:
                     print('epoch:', epoch+1)
                     print(f'train_{self.metric_best}:', train_metrics[-1])
                     print(f'val_{self.metric_best}:', val_metrics[-1])
                     print(f'test_{self.metric_best}:', test_metrics[-1])
 
-
-                scheduler.step()
+                if self.optim_scheduler == 'reduce_on_plateau':
+                    scheduler.step(val_metric)
+                elif self.optim_scheduler:
+                    scheduler.step()
+                # if `self.optim_scheduler` is not set
+                
                 # Early stopping
-                early_stopping(val_loss, model)
+                # NOTE changed to val_metric
+                early_stopping(val_metric, model)
                 if early_stopping.early_stop:
                     print("Early stopping triggered.")
                     break

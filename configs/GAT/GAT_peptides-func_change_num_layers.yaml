@@ -6,9 +6,9 @@ dataset:
   task: graph
   task_type: classification_multilabel
 train:
-  batch_size: 128
+  batch_size: 200
   eval_period: 1
-  epochs: 500
+  epochs: 200
   repetition: 5
   split_mode: random
   split_ratios: [0.7, 0.15, 0.15]
@@ -18,14 +18,15 @@ model:
   graph_pooling: mean
 gnn:
   heads: 4
-  num_layers: [1, 2, 3, 4, 5]
-  nhid: 96
+  num_layers: [4, 5, 6, 7, 8, 9, 10]
+  nhid: 76
   dropout: 0.5
 optim:
   clip_grad_norm: True
   optimizer: adamW
   weight_decay: 0.0
-  base_lr: 0.0003
-  scheduler: steplr
-  step_size: 20
-  gamma: 0.5
+  base_lr: 0.001
+  scheduler: reduce_on_plateau
+  reduce_factor: 0.5
+  schedule_patience: 5
+  min_lr: 0.00001
