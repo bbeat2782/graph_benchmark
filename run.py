@@ -26,6 +26,7 @@ from graphgps.logger import create_logger
 # 1. make use of graph_pooling, dropout, clip_grad_norm, weight_decay (or just use the same for all tests)
 # 2. Clean code that creates unnecessary folders/files
 # Later, possibly clean code overall using https://pytorch-geometric.readthedocs.io/en/2.5.2/advanced/graphgym.html
+# 3. comment all the parts so that it is readable
 
 def custom_set_out_dir(cfg, cfg_fname, name_tag):
     """Set custom main output directory path to cfg.

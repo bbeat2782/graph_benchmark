@@ -1,6 +1,7 @@
 import json
 import matplotlib.pyplot as plt
 import numpy as np
+from itertools import cycle
 
 file_path = 'results/result.json'
 with open(file_path, "r") as f:
@@ -81,12 +82,25 @@ for dataset, model_results in results.items():
             else:
                 print(f"    Metric: {metric} - Median: {stats['median']:.4f}, Std: {stats['std']:.4f}")
 
+global_model_colors = {
+    "GCN": "tab:blue",
+    "GIN": "tab:orange",
+    "GAT": "tab:green",
+}
 
 for dataset, model_results in results.items():
     metric_types = ["train_accuracys", "val_accuracys", "test_accuracys"]
     if dataset == 'Peptides-func':
         metric_types = ["train_aps", "val_aps", "test_aps"]
-
+    
+    line_styles = {"train_accuracys": ':', "val_accuracys": '-', "test_accuracys": '--'}
+    if dataset == 'Peptides-func':
+        line_styles = {"train_aps": ':', "val_aps": '-', "test_aps": '--'}
+    
+    plt.figure(figsize=(12, 8))
+    handles = []
+    labels = []
+    
     for metric_type in metric_types:
         plt.figure(figsize=(10, 6))
         legend_added = False
@@ -98,35 +112,48 @@ for dataset, model_results in results.items():
                     stds = change_stats["stds"]
                     elapsed_time = metrics_results['elapsed_time']['median']
                     
-                    # Plot medians
-                    plt.plot(
-                        medians, label=f"{model} {metric_type.replace('_', ' ').capitalize()} Median"
+                    # Use the predefined global color and line style
+                    line, = plt.plot(
+                        medians,
+                        label=f"{model.upper()} {metric_type.replace('_', ' ').capitalize()}",
+                        color=global_model_colors.get(model.upper(), "tab:gray"),  # Default to gray if model not found
+                        linestyle=line_styles[metric_type]
                     )
-                    legend_added = True  # Label added
                     
-                    # Plot standard deviation as shaded area
-                    plt.fill_between(
-                        range(len(medians)), 
-                        [m - s for m, s in zip(medians, stds)], 
-                        [m + s for m, s in zip(medians, stds)], 
-                        alpha=0.2
-                    )
-                    x_ticks = range(1, len(medians) + 1)
-                    plt.xticks(ticks=range(len(medians)), labels=x_ticks)
+                    # Store handles and labels for custom legend ordering
+                    handles.append(line)
+                    labels.append(f"{model.upper()} {metric_type.replace('_', ' ').capitalize()}")
+                    
+        if dataset == 'Peptides-func':
+            x_ticks = range(4, 3 + len(medians) + 1)
+        else:
+            x_ticks = range(1, len(medians) + 1)
+        plt.xticks(ticks=range(len(medians)), labels=x_ticks)
 
-        plt.title(f"{pluralize_metric(metric_type).replace('_', ' ').capitalize()} - Change in Number of Layers ({dataset})\nElapsed Time: {elapsed_time:.2f} seconds")
-        plt.xlabel("Number of layers")
-        plt.ylabel(pluralize_metric(metric_type).replace('_', ' ').capitalize())
-        if legend_added:
-            plt.legend()
-
-        plt.grid(True, color='gray', alpha=0.2)
-        
-        # Save the figure for this metric type
-        plt.savefig(f"figures/{dataset}_change_num_layers_{metric_type}.png", dpi=300)
-        
-        # Display the plot
-        plt.show()
-        
-        # Close the figure to prevent memory issues
-        plt.close()
+    # Dynamically construct ordered_labels for the current dataset
+    metric_suffix = "aps" if dataset == 'Peptides-func' else "accuracys"
+    ordered_models = ['GCN', 'GIN', 'GAT']
+    ordered_metrics = [f"train {metric_suffix}", f"val {metric_suffix}", f"test {metric_suffix}"]
+    ordered_labels = [f"{model} {metric.capitalize()}" for model in ordered_models for metric in ordered_metrics]
+    
+    # Sort handles and labels to match the desired order
+    sorted_handles_labels = sorted(zip(handles, labels), key=lambda x: ordered_labels.index(x[1]))
+    sorted_handles, sorted_labels = zip(*sorted_handles_labels)
+    
+    plt.title(f"Change in Number of Layers ({dataset})")
+    plt.xlabel("Number of layers")
+    plt.ylabel("Metric Value")
+    
+    # Add custom legend
+    plt.legend(sorted_handles, sorted_labels, loc='upper left', bbox_to_anchor=(1.05, 1), borderaxespad=0., fontsize='small')
+    
+    plt.grid(True, color='gray', alpha=0.2)
+    
+    # Save the figure for this dataset
+    plt.savefig(f"figures/{dataset}_change_num_layers_combined.png", dpi=300, bbox_inches='tight')
+    
+    # Display the plot
+    plt.show()
+    
+    # Close the figure to prevent memory issues
+    plt.close()
