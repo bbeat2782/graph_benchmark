@@ -3,6 +3,7 @@ import os
 import json
 import torch
 import yaml
+import time  # Import the time module
 from src.utils.utils import Train, plot_accuracy, changing_num_layers, plot_boxplot
 from src.models.gcn import GCN
 from src.models.gin import GIN
@@ -80,11 +81,11 @@ def main():
         # 'configs/GAT/GAT_peptides-func.yaml',
         
         # # change num layers  file name: `peptides_result_change_num_layers.json`
-        # 'configs/GCN/GCN_cora_change_num_layers.yaml',
+        'configs/GCN/GCN_cora_change_num_layers.yaml',
         # 'configs/GCN/GCN_enzymes_change_num_layers.yaml',
         # 'configs/GCN/GCN_imdb_binary_change_num_layers.yaml',
         # 'configs/GCN/GCN_peptides-func_change_num_layers.yaml',
-        'configs/GIN/GIN_cora_change_num_layers.yaml',
+        # 'configs/GIN/GIN_cora_change_num_layers.yaml',
         # 'configs/GIN/GIN_enzymes_change_num_layers.yaml',
         # 'configs/GIN/GIN_imdb_binary_change_num_layers.yaml',
         # 'configs/GIN/GIN_peptides-func_change_num_layers.yaml',
@@ -95,7 +96,7 @@ def main():
     ]
 
     result = {}
-    output_file = "results/GIN_cora.json"
+    output_file = "results/result.json"
     if os.path.exists(output_file):
         with open(output_file, "r") as f:
             result = json.load(f)
@@ -113,6 +114,8 @@ def main():
 
         if dataset_name not in result:
             result[dataset_name] = {}
+
+        start_time = time.time()  # Measure start time
 
         if model_name == 'GPSModel':
             set_cfg(cfg)
@@ -141,6 +144,10 @@ def main():
             trainer = Train(config)
         # TODO need an extra function to get the best metric using val_loss
         train_losses, val_losses, test_losses, train_metrics, val_metrics, test_metrics = trainer()
+
+        end_time = time.time()  # Measure end time
+        elapsed_time = end_time - start_time  # Calculate elapsed time
+
         if 'gnn' in config and 'num_layers' in config['gnn'] and isinstance(config['gnn']['num_layers'], list):
             if model_name not in result[dataset_name]:
                 result[dataset_name][model_name] = {}
@@ -150,7 +157,8 @@ def main():
                 'test_losses': test_losses,
                 f'train_{metric}s': train_metrics,
                 f'val_{metric}s': val_metrics,
-                f'test_{metric}s': test_metrics
+                f'test_{metric}s': test_metrics,
+                'elapsed_time': elapsed_time  # Store elapsed time
             }
         else:
             result[dataset_name][model_name] = {
@@ -159,7 +167,8 @@ def main():
                 'test_losses': test_losses,
                 f'train_{metric}s': train_metrics,
                 f'val_{metric}s': val_metrics,
-                f'test_{metric}s': test_metrics
+                f'test_{metric}s': test_metrics,
+                'elapsed_time': elapsed_time  # Store elapsed time
             }
 
         with open(output_file, "w") as f:

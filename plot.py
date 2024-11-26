@@ -34,7 +34,12 @@ for dataset, models in results_data.items():
     for model, metrics in models.items():
         results[dataset][model] = {}
         for metric in metrics.keys():
-            if "losses" not in metric and 'change' not in metric:
+            if metric == 'elapsed_time':
+                results[dataset][model][metric] = {
+                    'median': metrics[metric],
+                    'std': 0
+                }
+            elif "losses" not in metric and 'change' not in metric:
                 median, std = extract_median_std(metrics[metric])
                 results[dataset][model][metric] = {
                     'median': median,
@@ -43,7 +48,12 @@ for dataset, models in results_data.items():
             elif 'change' in metric:
                 results[dataset][model]['change_num_layers'] = {}
                 for change_metric, histories in metrics[metric].items():
-                    if 'losses' not in change_metric:
+                    if change_metric == 'elapsed_time':
+                        results[dataset][model]['change_num_layers'][change_metric] = {
+                            'medians': [histories],
+                            'stds': [0]
+                        }
+                    elif 'losses' not in change_metric:
                         medians, stds = combine_change_num_layers(histories)
                         results[dataset][model]['change_num_layers'][change_metric] = {
                             'medians': medians,
@@ -79,13 +89,14 @@ for dataset, model_results in results.items():
 
     for metric_type in metric_types:
         plt.figure(figsize=(10, 6))
-        legend_added = False  # Track if any labels are added to the plot
+        legend_added = False
         for model, metrics_results in model_results.items():
             if "change_num_layers" in metrics_results:
                 if metric_type in metrics_results["change_num_layers"]:
                     change_stats = metrics_results["change_num_layers"][metric_type]
                     medians = change_stats["medians"]
                     stds = change_stats["stds"]
+                    elapsed_time = metrics_results['elapsed_time']['median']
                     
                     # Plot medians
                     plt.plot(
@@ -103,7 +114,7 @@ for dataset, model_results in results.items():
                     x_ticks = range(1, len(medians) + 1)
                     plt.xticks(ticks=range(len(medians)), labels=x_ticks)
 
-        plt.title(f"{pluralize_metric(metric_type).replace('_', ' ').capitalize()} - Change in Number of Layers ({dataset})")
+        plt.title(f"{pluralize_metric(metric_type).replace('_', ' ').capitalize()} - Change in Number of Layers ({dataset})\nElapsed Time: {elapsed_time:.2f} seconds")
         plt.xlabel("Number of layers")
         plt.ylabel(pluralize_metric(metric_type).replace('_', ' ').capitalize())
         if legend_added:

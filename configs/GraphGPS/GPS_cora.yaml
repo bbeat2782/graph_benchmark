@@ -28,7 +28,7 @@ train:
   eval_period: 5
   # ckpt_period: 100
   enable_ckpt: False
-  epochs: 200
+  epochs: 10
   repetition: 10
   split_mode: random
   split_ratios: [0.7, 0.15, 0.15]
