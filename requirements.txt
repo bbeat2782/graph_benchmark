@@ -13,4 +13,4 @@ yacs==0.1.8
 torchmetrics==1.5.2
 matplotlib==3.9.2
 torch_scatter==2.1.2
-transformers==
+transformers==4.46.3

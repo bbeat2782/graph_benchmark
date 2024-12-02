@@ -59,43 +59,43 @@ def custom_set_run_dir(cfg, run_id):
 def main():
     model_dataset_to_evaluate = [
         # cora
-        # 'configs/GCN/GCN_cora.yaml',
-        # 'configs/GIN/GIN_cora.yaml',
-        # 'configs/GAT/GAT_cora.yaml',
-        # 'configs/GraphGPS/GPS_cora.yaml',
+        'configs/GCN/GCN_cora.yaml',
+        'configs/GIN/GIN_cora.yaml',
+        'configs/GAT/GAT_cora.yaml',
+        'configs/GraphGPS/GPS_cora.yaml',
         # # enzymes
-        # 'configs/GCN/GCN_enzymes.yaml',
-        # 'configs/GIN/GIN_enzymes.yaml',
-        # 'configs/GAT/GAT_enzymes.yaml',
-        # 'configs/GraphGPS/GPS_enzymes.yaml',
+        'configs/GCN/GCN_enzymes.yaml',
+        'configs/GIN/GIN_enzymes.yaml',
+        'configs/GAT/GAT_enzymes.yaml',
+        'configs/GraphGPS/GPS_enzymes.yaml',
         # # imdb
-        # 'configs/GCN/GCN_imdb_binary.yaml',
-        # 'configs/GIN/GIN_imdb_binary.yaml',
-        # 'configs/GAT/GAT_imdb_binary.yaml',
-        # 'configs/GraphGPS/GPS_imdb_binary.yaml',
-        # # peptides  file name: `peptides_result_use_this.json`
-        # 'configs/GraphGPS/GPS_peptides-func.yaml',
-        # 'configs/GCN/GCN_peptides-func.yaml',
-        # 'configs/GIN/GIN_peptides-func.yaml',
-        # 'configs/GAT/GAT_peptides-func.yaml',
+        'configs/GCN/GCN_imdb_binary.yaml',
+        'configs/GIN/GIN_imdb_binary.yaml',
+        'configs/GAT/GAT_imdb_binary.yaml',
+        'configs/GraphGPS/GPS_imdb_binary.yaml',
+        # # peptides
+        'configs/GraphGPS/GPS_peptides-func.yaml',
+        'configs/GCN/GCN_peptides-func.yaml',
+        'configs/GIN/GIN_peptides-func.yaml',
+        'configs/GAT/GAT_peptides-func.yaml',
         
-        # # change num layers  file name: `peptides_result_change_num_layers.json`
-        # 'configs/GCN/GCN_cora_change_num_layers.yaml',
-        # 'configs/GCN/GCN_enzymes_change_num_layers.yaml',
-        # 'configs/GCN/GCN_imdb_binary_change_num_layers.yaml',
-        # 'configs/GCN/GCN_peptides-func_change_num_layers.yaml',
+        # change num layers
+        'configs/GCN/GCN_cora_change_num_layers.yaml',
+        'configs/GCN/GCN_enzymes_change_num_layers.yaml',
+        'configs/GCN/GCN_imdb_binary_change_num_layers.yaml',
+        'configs/GCN/GCN_peptides-func_change_num_layers.yaml',
         'configs/GIN/GIN_cora_change_num_layers.yaml',
-        # 'configs/GIN/GIN_enzymes_change_num_layers.yaml',
-        # 'configs/GIN/GIN_imdb_binary_change_num_layers.yaml',
-        # 'configs/GIN/GIN_peptides-func_change_num_layers.yaml',
-        # 'configs/GAT/GAT_cora_change_num_layers.yaml',
-        # 'configs/GAT/GAT_enzymes_change_num_layers.yaml',
-        # 'configs/GAT/GAT_imdb_binary_change_num_layers.yaml',
-        # 'configs/GAT/GAT_peptides-func_change_num_layers.yaml',
+        'configs/GIN/GIN_enzymes_change_num_layers.yaml',
+        'configs/GIN/GIN_imdb_binary_change_num_layers.yaml',
+        'configs/GIN/GIN_peptides-func_change_num_layers.yaml',
+        'configs/GAT/GAT_cora_change_num_layers.yaml',
+        'configs/GAT/GAT_enzymes_change_num_layers.yaml',
+        'configs/GAT/GAT_imdb_binary_change_num_layers.yaml',
+        'configs/GAT/GAT_peptides-func_change_num_layers.yaml',
     ]
 
     result = {}
-    output_file = "results/GIN_cora.json"
+    output_file = "results/result.json"
     if os.path.exists(output_file):
         with open(output_file, "r") as f:
             result = json.load(f)
